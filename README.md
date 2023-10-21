@@ -9,6 +9,8 @@ Plugin that recieves mqtt messages regarding the level of water in water tanks a
 
 `water_tank-docs.html`->`SIP/static/docs/plugins/water_tank-docs.html`
 
+`water_tank.js`->`SIP/static/scripts/water_tank.js`
+
 `water_tank.manifest` -> `SIP/plugins/manifests/water_tank.manifest`
 
 ## GUI setup
