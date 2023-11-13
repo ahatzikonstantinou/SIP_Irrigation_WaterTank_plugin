@@ -13,6 +13,4 @@ Plugin that recieves mqtt messages regarding the level of water in water tanks a
 
 `water_tank.manifest` -> `SIP/plugins/manifests/water_tank.manifest`
 
-## GUI setup
-At plugin setup choose the id of the div element next to which the water-tank element is to be displayed.
-Choose whether it should go before or after it.
+
