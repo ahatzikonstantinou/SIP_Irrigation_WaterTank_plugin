@@ -1,0 +1,369 @@
+$def with(settings, pnames, water_tank_id)
+
+$var title: $_('SIP Water-Tank Plugin')
+$var page: water_tank_plugin  
+<script>
+    var water_tank_data;
+    
+    // Initialize behaviors
+    jQuery(document).ready(function(){
+
+        jQuery("#cAddNew").click(function() {
+            jQuery("#original_water_tank_id").val("");            
+            jQuery("#pluginForm").submit();
+        });
+
+        jQuery("#cUpdate").click(function() {
+            if(jQuery("#original_water_tank_id").val().trim().length === 0)
+            {
+                alert("$_('No water tank will be updated because no water tank was selected.')");
+            }
+            jQuery("#action").val("update");
+            jQuery("#pluginForm").submit();
+        });
+
+        jQuery("button#cDelete").click(function(){
+            jQuery("#pluginForm").attr('action', '/water-tank-delete');
+            jQuery("#pluginForm").submit();
+        });
+
+        jQuery("button#cCancel").click(function(){
+            window.location="/";
+        });
+
+        jQuery("button#docButton").click(function(){
+            window.open("static/docs/plugins/proto-docs.html", "_blank");
+        });
+
+        // console.log('Getting all water tank data');
+        jQuery.getJSON('water-tank-get-all', function(data){
+            // console.log('data:', data);
+            water_tank_data = data;
+            console.log('water_tank_data:', water_tank_data);
+
+            $if water_tank_id:
+                getWaterTankData("$water_tank_id");
+            $else:
+                jQuery("input[name=type][value=1]").click();
+        });        
+
+        //
+        // Register mqtt client to update water tank data based on incoming mqtt messages
+        // Create a client instance
+        jQuery.getJSON('water-tank-get_mqtt_settings', function(data)
+        {
+            let mqtt_settings = null;
+        
+            console.log('mqtt_settings: ', data);
+            mqtt_settings = data;
+
+            const client_id = "browser_" + uuidv4();
+            console.log('water_tank.html connecting to mqtt broker with ' +
+            mqtt_settings.broker_host + ", " + mqtt_settings.mqtt_broker_ws_port + ", " + client_id);
+            water_plugin_client = new Paho.MQTT.Client(mqtt_settings.broker_host, mqtt_settings.mqtt_broker_ws_port, client_id);
+
+            // set callback handlers
+            water_plugin_client.onConnectionLost = onConnectionLost;
+            water_plugin_client.onMessageArrived = onMessageArrived;
+
+            // connect the client
+            water_plugin_client.connect({onSuccess:onConnect});
+
+            // called when the client connects
+            function onConnect() {
+                // Once a connection has been made, make a subscription and send a message.
+                console.log("onConnect");
+                water_plugin_client.subscribe(mqtt_settings.data_publish_mqtt_topic);
+            }
+
+            // called when the client loses its connection
+            function onConnectionLost(responseObject) {
+                if (responseObject.errorCode !== 0) {
+                    console.log("onConnectionLost:"+responseObject.errorMessage);
+                }
+            }
+
+            // called when a message arrives
+            function onMessageArrived(message) {
+                console.log("onMessageArrived:"+message.payloadString);
+                try
+                {
+                    const water_tanks = JSON.parse(message.payloadString);
+                    console.log('Received MQTT message:', water_tanks);  
+                    Object.keys(water_tanks).forEach(e => {
+                        console.log(`key= $${e} value=$${water_tanks[e]}`);
+                        const id = e;
+                        const water_tank = water_tanks[e];
+                        console.log('id: ' + id + ", water_tank: ", water_tank);
+                        let td = jQuery("td").filter(function() {
+                            return $$(this).text() === id;
+                        });
+                        console.log('td: ', td.text());
+                        td.removeClass();
+                        td.addClass(DetermineWaterTankState(water_tank));
+                        if(water_tank.percentage != null)
+                        {
+                            td.nextAll().eq(1).text(Math.round(water_tank.percentage)+"%");
+                            td.nextAll().eq(2).text(water_tank.last_updated);
+                        }
+
+                        jQuery("#last_updated").val(water_tank.last_updated);
+                        jQuery("#invalid_sensor_measurement").css({ visibility: (water_tank.invalid_sensor_measurement? "visible" : "hidden")});
+                        jQuery("#percentage").val(water_tank.percentage != null ? Math.round(water_tank.percentage) : "");
+
+                    });
+                }
+                catch(e)
+                {
+                    console.error(e);
+                }
+            }
+        });
+        
+        jQuery("#pluginForm").validate({
+            rules: {
+                id: {
+                    pattern: /^[a-zA-Z0-9_]+$$/
+                    },
+            },
+            messages: {
+                id: {
+                    pattern: 'Only letters, numbers, and underscores are allowed'
+                    }
+            }
+        });
+        
+    });
+
+    function getWaterTankData(id)
+    {
+        // console.log('Getting water tank data for id :', id);
+        // console.log('water_tank_data:', water_tank_data);
+        let water_tank = water_tank_data.find( w => {
+            return w.id === id;
+        });
+        console.log('From water_tank_data: ', water_tank);
+        // console.log(jQuery("#id_"+id).text());
+        // console.log(jQuery("#enabled_"+id).is(":checked"));
+        jQuery("#id").val(water_tank.id);
+        jQuery("#original_water_tank_id").val(water_tank.id);
+        jQuery("#label").val(water_tank.label);
+        jQuery("#enabled").prop('checked', water_tank.enabled);
+        // jQuery("input[name=type][value=" + water_tank.type + "]").prop('checked', true);
+        jQuery("input[name=type][value=" + water_tank.type + "]").click();
+
+        jQuery("#width").val(water_tank.width);
+        jQuery("#length").val(water_tank.length);
+        jQuery("#diameter").val(water_tank.diameter);
+        jQuery("#height").val(water_tank.height);
+        jQuery("#horizontal_axis").val(water_tank.horizontal_axis);
+        jQuery("#vertical_axis").val(water_tank.vertical_axis);
+        
+        jQuery("#sensor_mqtt_topic").val(water_tank.sensor_mqtt_topic);
+        jQuery("#sensor_offset_from_top").val(water_tank.sensor_offset_from_top);
+        jQuery("#min_valid_sensor_measurement").val(water_tank.min_valid_sensor_measurement);
+        jQuery("#max_valid_sensor_measurement").val(water_tank.max_valid_sensor_measurement);
+        jQuery("#sensor_measurement").val(water_tank.sensor_measurement);
+        jQuery("#last_updated").val(water_tank.last_updated);
+        jQuery("#invalid_sensor_measurement").css({ visibility: (water_tank.invalid_sensor_measurement? "visible" : "hidden")});
+        jQuery("#percentage").val(Math.round(water_tank.percentage));
+
+        jQuery("#overflow_level").val(water_tank.overflow_level);
+        jQuery("#overflow_email").val(water_tank.overflow_email);
+        jQuery("#overflow_xmpp").val(water_tank.overflow_xmpp);
+        jQuery("#overflow_safe_level").val(water_tank.overflow_safe_level);
+        $for pn in pnames:
+            jQuery("#overflow_program_$pn").prop('checked', water_tank.overflow_programs["$pn"]);
+        
+        jQuery("#warning_level").val(water_tank.warning_level);
+        jQuery("#warning_email").val(water_tank.warning_email);
+        jQuery("#warning_xmpp").val(water_tank.warning_xmpp);        
+        $for pn in pnames:
+            jQuery("#warning_suspend_program_$pn").prop('checked', water_tank.warning_suspend_programs[$pn]);
+        $for pn in pnames:
+            jQuery("#warning_activate_program_$pn").prop('checked', water_tank.warning_activate_programs[$pn]);
+        
+        jQuery("#critical_level").val(water_tank.critical_level);
+        jQuery("#critical_email").val(water_tank.critical_email);
+        jQuery("#critical_xmpp").val(water_tank.critical_xmpp);
+        $for pn in pnames:
+            jQuery("#critical_suspend_program_$pn").prop('checked', water_tank.critical_suspend_programs[$pn]);
+        $for pn in pnames:
+            jQuery("#critical_activate_program_$pn").prop('checked', water_tank.critical_activate_programs[$pn]);
+        
+        jQuery("button#cDelete").prop('disabled', false);
+        let x = jQuery("input[name='type']:checked");
+    }
+
+    function typeSelected(type)
+    {
+        switch(type)
+        {
+            case 1: //RECTANGULAR
+                jQuery("#width").show(); jQuery("#width").parent().show();jQuery("#width").parent().prev().show();jQuery("#width").prop('required',true);
+                jQuery("#length").show(); jQuery("#length").parent().show();jQuery("#length").parent().prev().show();jQuery("#length").prop('required',true);
+                jQuery("#diameter").hide(); jQuery("#diameter").parent().hide();jQuery("#diameter").parent().prev().hide();jQuery("#diameter").prop('required',false);
+                jQuery("#height").show(); jQuery("#height").parent().show();jQuery("#height").parent().prev().show();jQuery("#height").prop('required',true);
+                jQuery("#horizontal_axis").hide(); jQuery("#horizontal_axis").parent().hide();jQuery("#horizontal_axis").parent().prev().hide();jQuery("#horizontal_axis").prop('required',false);
+                jQuery("#vertical_axis").hide(); jQuery("#vertical_axis").parent().hide();jQuery("#vertical_axis").parent().prev().hide();jQuery("#vertical_axis").prop('required',false);
+                break;
+            case 2: //CYLINDRICAL_HORIZONTAL
+                jQuery("#width").hide(); jQuery("#width").parent().hide(); jQuery("#width").parent().prev().hide();jQuery("#width").prop('required', false);
+                jQuery("#length").show(); jQuery("#length").parent().show(); jQuery("#length").parent().prev().show();jQuery("#length").prop('required', true);
+                jQuery("#diameter").show(); jQuery("#diameter").parent().show(); jQuery("#diameter").parent().prev().show();jQuery("#diameter").prop('required', true);
+                jQuery("#height").hide(); jQuery("#height").parent().hide(); jQuery("#height").parent().prev().hide();jQuery("#height").prop('required', false);
+                jQuery("#horizontal_axis").hide(); jQuery("#horizontal_axis").parent().hide(); jQuery("#horizontal_axis").parent().prev().hide();jQuery("#horizontal_axis").prop('required', false);
+                jQuery("#vertical_axis").hide(); jQuery("#vertical_axis").parent().hide(); jQuery("#vertical_axis").parent().prev().hide();jQuery("#vertical_axis").prop('required', false);
+                break;
+            case 3: //CYLINDRICAL_VERTICAL
+                jQuery("#width").hide(); jQuery("#width").parent().hide(); jQuery("#width").parent().prev().hide();jQuery("#width").prop('required', false);
+                jQuery("#length").hide(); jQuery("#length").parent().hide(); jQuery("#length").parent().prev().hide();jQuery("#length").prop('required', false);
+                jQuery("#diameter").show(); jQuery("#diameter").parent().show(); jQuery("#diameter").parent().prev().show();jQuery("#diameter").prop('required', true);
+                jQuery("#height").show(); jQuery("#height").parent().show(); jQuery("#height").parent().prev().show();jQuery("#height").prop('required', true);
+                jQuery("#horizontal_axis").hide(); jQuery("#horizontal_axis").parent().hide(); jQuery("#horizontal_axis").parent().prev().hide();jQuery("#horizontal_axis").prop('required', false);
+                jQuery("#vertical_axis").hide(); jQuery("#vertical_axis").parent().hide(); jQuery("#vertical_axis").parent().prev().hide();jQuery("#vertical_axis").prop('required', false);
+                break;
+            case 4: //ELLIPTICAL
+                jQuery("#width").hide(); jQuery("#width").parent().hide(); jQuery("#width").parent().prev().hide();jQuery("#width").prop('required', false);
+                jQuery("#length").show(); jQuery("#length").parent().show(); jQuery("#length").parent().prev().show();jQuery("#length").prop('required', true);
+                jQuery("#diameter").hide(); jQuery("#diameter").parent().hide(); jQuery("#diameter").parent().prev().hide();jQuery("#diameter").prop('required', false);
+                jQuery("#height").hide(); jQuery("#height").parent().hide(); jQuery("#height").parent().prev().hide();jQuery("#height").prop('required', false);
+                jQuery("#horizontal_axis").show(); jQuery("#horizontal_axis").parent().show(); jQuery("#horizontal_axis").parent().prev().show();jQuery("#horizontal_axis").prop('required', true);
+                jQuery("#vertical_axis").show(); jQuery("#vertical_axis").parent().show(); jQuery("#vertical_axis").parent().prev().show();jQuery("#vertical_axis").prop('required', true);
+                break;
+            default:
+                console.error("Uknown water tank type '" + type + "'");
+        }
+    }
+</script>
+
+<div id="plugin" class="water-tank">
+    <div class="title">Water Tank Plugin
+    <button class="execute" id="docButton" type="button" >$_('Help')</button>
+    </div>
+    <hr>
+    <form id="pluginForm" class="water-tank" action="/water-tank-save" method="post">
+        <h3>MQTT</h3>
+        <p class="info">$_('SIP will listen for incomming messages in the Subscribe topic. As soon as message arrives, SIP will publish all water tank data to the Publish topic. The broker ws port is required for the Paho javascript library, please note that for a broker like mosquitto this is a different listener port than the standard 1883.')</p>
+        <fieldset class="two-col">
+            <label>$_('Broker WS Port'):</label><input type="text" id="mqtt_broker_ws_port" name="mqtt_broker_ws_port" value="$settings['mqtt_broker_ws_port']"/>
+            <label>$_('Data-Request Subscribe Topic'):</label><input type="text" id="request_subscribe_mqtt_topic" name="request_subscribe_mqtt_topic" value="$settings['request_subscribe_mqtt_topic']"/>
+            <label>$_('Data-Publish Topic'):</label><input type="text" id="data_publish_mqtt_topic" name="data_publish_mqtt_topic" value="$settings['data_publish_mqtt_topic']"/>
+        </fieldset>
+        <hr>
+        <h3>$_('Water Tanks')</h3>
+        <p class="info">Add, Edit, and Delete water tank records</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>$_('ID')</th>
+                    <th>$_('Label')</th>
+                    <th>$_('Full')</th>
+                    <th>$_('Last Update')</th>
+                    <th>$_('Enable')</th>
+                </tr>
+            </thead>
+            $for tank in settings['water_tanks'].values():
+                <tr onclick="getWaterTankData('$tank['id']')">
+                    $ sensor_error = 'sensor_error' if tank['invalid_sensor_measurement'] else ''
+                    <td class="$sensor_error">$tank['id']</td>
+                    <td>$tank['label']</td>
+                    $ str_percentage = str(round(tank['percentage'])) + '%' if tank['percentage'] else ''
+                    <td>$str_percentage</td>
+                    <td>$tank['last_updated']</td>
+                    $ checked = 'checked="checked"' if tank['enabled'] else ''
+                    <td><input type="checkbox" name="static" onclick="return false;" $checked/></td>                
+                </tr>
+        </table>
+
+        <h4>$_('Water Tank Details')</h4>
+        <input type="hidden" id="original_water_tank_id" name="original_water_tank_id" value=""/>
+        <input type="hidden" id="action" name="action" value="add"/>
+        <fieldset class="two-col">
+            <label>$_('Id'):</label><div><input type="text" id="id" name="id" value="" pattern="[a-zA-Z0-9_]+" title="$_('Only letters, numbers, and underscores are allowed')" required/></div>
+            <label>$_('Label'):</label><div><input type="text" id="label" name="label" value="" required/></div>
+            <label>$_('Type'):</label>
+            <fieldset class="one-col">
+                <label><input type="radio" name="type" value="1" hidden onClick="typeSelected(1)">$_('RECTANGULAR')</label>
+                <label><input type="radio" name="type" value="2" hidden onClick="typeSelected(2)">$_('CYLINDRICAL_HORIZONTAL')</label>
+                <label><input type="radio" name="type" value="3" hidden onClick="typeSelected(3)">$_('CYLINDRICAL_VERTICAL')</label>
+                <label><input type="radio" name="type" value="4" hidden onClick="typeSelected(4)">$_('ELLIPTICAL')</label>
+            </fieldset>
+            <label>$_('Width'):</label><div><input type=number min=0 id="width" name="width" value=""/></div>
+            <label>$_('Length'):</label><div><input type=number min=0 id="length" name="length" value=""/></div>
+            <label>$_('Diameter'):</label><div><input type=number min=0 id="diameter" name="diameter" value=""/></div>
+            <label>$_('Height'):</label><div><input type=number min=0 id="height" name="height" value=""/></div>
+            <label>$_('Horizontal Axis'):</label><div><input type=number min=0 id="horizontal_axis" name="horizontal_axis" value=""/></div>
+            <label>$_('Vertical Axis'):</label><div><input type=number min=0 id="vertical_axis" name="vertical_axis" value=""/></div>
+            <label>$_('Sensor Mqtt Topic'):</label><div><input type=text id="sensor_mqtt_topic" name="sensor_mqtt_topic" value=""/></div>
+            <label>$_('Sensor offset from top'):</label><div><input type=number id="sensor_offset_from_top" name="sensor_offset_from_top" value="0.0" required/></div>
+            <label>$_('Min valid sesnor measurment'):</label><div><input type=number id="min_valid_sensor_measurement" name="min_valid_sensor_measurement" value=""/></div>
+            <label>$_('Max valid sensor measurment'):</label><div><input type=number id="max_valid_sensor_measurement" name="max_valid_sensor_measurement" value=""/></div>
+            <label>$_('Sensor measurment'):</label><div><input type=number id="sensor_measurement" name="sensor_measurement" value=""readonly/></div>
+            <label>$_('Invalid sensor measurment'):</label><div><img src="/static/images/warning-icon24x24.png" id="invalid_sensor_measurement" name="invalid_sensor_measurement" style="visibility:hidden"/></div>
+            <label>$_('Last updated'):</label><div><input type=text id="last_updated" name="last_updated" value="" readonly/></div>
+            <label>$_('Full %'):</label><div><input type=number id="percentage" name="percentage" value="" readonly/></div>
+            <label>$_('Enabled'):</label><div><input type="checkbox" id="enabled" name="enabled"/></div>
+        </fieldset>
+
+        <h4>$_('Overflow')</h4>
+        <p class="info">$_('Define at what % level an overflow occurs, which programs will run, the safe level % until which they will run, which emails and xmpp accounts to notify.')</p>
+        <fieldset class="two-col">            
+            <label>$_('Overflow Level'):</label><div><input id="overflow_level" name="overflow_level" type=number min=0 max=100/></div>
+            <label>$_('Safe level'):</label><div><input id="overflow_safe_level" name="overflow_safe_level" type=number min=0 max=100/></div>
+            <label>$_('Email'):</label><div><input id="overflow_email" name="overflow_email" type="email"/></div>
+            <label>$_('Xmpp'):</label><input id="overflow_xmpp" name="overflow_xmpp" type="text"/>
+            <label>$_('Run Programs'):</label><div style="display:flex; flex-wrap: wrap;">
+                $for pn in pnames:
+                    <label>$pn<input id="overflow_program_$pn" name="overflow_program_$pn" type="checkbox"/></label>
+                </div>            
+        </fieldset>
+
+        <h4>$_('Warning')</h4>
+        <p class="info">$_('Define at what % level a warning occurs, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
+        <fieldset class="two-col">
+            <label>$_('Level'):</label><div><input id="warning_level" name="warning_level" type=number min=0 max=100/></div>
+            <label>$_('Email'):</label><div><input id="warning_email" name="warning_email" type="email"/></div>
+            <label>$_('Xmpp'):</label><input id="warning_xmpp" name="warning_xmpp" type="text"/>
+            <label>$_('Suspend Programs'):</label><div style="display:flex; flex-wrap: wrap;">
+                $for pn in pnames:
+                    <label>$pn<input id="warning_suspend_program_$pn" name="warning_suspend_program_$pn" type="checkbox"/></label>
+                </div>
+            <label>$_('Activate Programs'):</label><div style="display:flex; flex-wrap: wrap;">
+                $for pn in pnames:
+                    <label>$pn<input id="warning_activate_program_$pn" name="warning_activate_program_$pn" type="checkbox"/></label>
+                </div>
+        </fieldset>
+
+        <h4>$_('Critical')</h4>
+        <p class="info">$_('Define which % level is critical, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
+        <fieldset class="two-col">
+            <label>$_('Level'):</label><div><input id="critical_level" name="critical_level" type=number min=0 max=100/></div>
+            <label>$_('Email'):</label><div><input id="critical_email" name="critical_email" type="email"/></div>
+            <label>$_('Xmpp'):</label><input id="critical_xmpp" name="critical_xmpp" type="text"/>
+            <label>$_('Suspend Programs'):</label><div style="display:flex; flex-wrap: wrap;">
+                $for pn in pnames:
+                    <label>$pn<input id="critical_suspend_program_$pn" name="critical_suspend_program_$pn" type="checkbox"/></label>
+                </div>
+            <label>$_('Activate Programs'):</label><div style="display:flex; flex-wrap: wrap;">
+                $for pn in pnames:
+                    <label>$pn<input id="critical_activate_program_$pn" name="critical_activate_program_$pn" type="checkbox"/></label>
+                </div>
+        </fieldset>
+
+        <h4>$_('Water Loss')</h4>
+        <p class="info">$_('When sensors report decreasing water level but no valves are open, water is leaking or being stolen. Specify which emails and xmpp accounts to notify.')</p>
+        <fieldset class="two-col">
+            <label>$_('Email'):</label><input id="loss_email" name="loss_email" type="text"/>
+            <label>$_('Xmpp'):</label><input id="loss_xmpp" name="loss_xmpp" type="text"/>
+        </fieldset>  
+        </br>
+    </form>
+
+<div class="controls">
+    <button id="cAddNew" class="submit"><b>$_('Add New')</b></button>
+    <button id="cUpdate" class="submit"><b>$_('Update')</b></button>
+    <button id="cDelete" class="submit danger" disabled="true"><b>$_('Delete')</b></button>
+    <button id="cCancel" class="cancel danger">$_('Cancel')</button>
+</div>
+</div>

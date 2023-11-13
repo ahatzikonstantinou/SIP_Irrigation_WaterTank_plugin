@@ -1,0 +1,200 @@
+.water-tank label{
+    border: none!important;
+    padding-left: 4px!important;
+    padding-right: 4px!important;
+}
+
+form.water-tank input{
+    display:inline-block;
+}
+
+.water-tank fieldset.two-col{
+    /* border-radius: 12px; */
+    width: 100%;
+    border: none;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    row-gap: 8px;
+    margin-inline: 0 0;
+    margin-block: 0 0;
+    padding-inline: 0 0;
+    padding-block: 0 0;
+}
+
+
+.water-tank fieldset.two-col label{
+    display: inline-block;
+    white-space: normal;  /*this will wrap words on whitespace*/
+}
+
+.water-tank fieldset.one-col{
+    /* border-radius: 12px; */
+    border: 1px solid black;
+    display: grid;
+    grid-template-columns: 1fr;
+    row-gap: 8px;
+    margin-inline: 0 0;
+    margin-block: 0 0;
+    padding-inline: 0 0;
+    padding-block: 0 0;
+}
+
+.water-tank fieldset.one-col label{
+    display: inline-block;
+    white-space: nowrap;  /*this will wrap words on whitespace*/
+}
+
+.water-tank .info{
+    color: rgb(120, 120, 120);
+    font-size: small;
+    margin-bottom: 0.5em;
+}
+
+.water-tank h3{
+    margin-bottom: 4px;
+    margin-top: 4px;
+}
+
+.water-tank h4{
+    margin-bottom: 4px;
+    margin-top: 20px;
+    text-decoration-line: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: #404040;
+    color: #404040;
+}
+
+.water-tank table{
+    border: 2px solid rgb(120, 120, 120);
+    border-radius: 4px;
+    border-collapse:collapse;
+}
+
+.water-tank table thead tr {
+    background-color: #2E3959;
+    color: #ffffff;
+    text-align: left;
+}
+
+.water-tank th,
+.water-tank td {
+    padding: 4px 4px;
+}
+
+.water-tank tbody tr {
+    border-bottom: 1px solid #dddddd;
+}
+
+.water-tank tbody tr:nth-of-type(even) {
+    background-color: #f3f3f3;
+}
+
+.water-tank tbody tr:last-of-type {
+    border-bottom: 2px solid #009879;
+}
+
+.water-tank tbody tr.active-row {
+    font-weight: bold;
+    color: #009879;
+}
+
+/* Classes used for water_tank.html form validation */
+.error {
+    border: 2px solid #f00;
+}
+
+.valid {
+    border: 1px solid #0ff;
+}
+
+/* Classes used for the widgets representing water tanks in the home page */
+.percent-bar.normal {
+    background-color: cyan;
+}
+
+.percent-bar.warning {
+    background-color: yellow;
+}
+
+@-webkit-keyframes critical {    
+    from, to {    
+        background-color: transparent    
+    }    
+    50% {    
+        background-color: red    
+    }    
+}    
+@keyframes critical {    
+    from, to {    
+        background-color: transparent    
+    }    
+    50% {    
+        background-color: red    
+    }    
+}    
+
+.percent-bar.critical {        
+    -webkit-animation: critical 1s step-end infinite;    
+    animation: critical 1s step-end infinite;    
+}
+
+
+@-webkit-keyframes overflow {    
+    from, to {    
+        background-color: transparent    
+    }    
+    50% {    
+        background-color: lightskyblue    
+    }    
+}    
+@keyframes overflow {    
+    from, to {    
+        background-color: transparent    
+    }    
+    50% {    
+        background-color: lightskyblue    
+    }    
+}    
+
+.percent-bar.overflow {        
+    -webkit-animation: overflow 1s step-end infinite;    
+    animation: overflow 1s step-end infinite;    
+}
+
+.water-tank td.sensor_error {
+    background-image: url('/static/images/warning-icon24x24.png');
+    background-repeat: no-repeat;
+    padding-left: 24px!important;
+    display: block;
+    margin-top: 0.5em;
+    margin-left: 2px;
+    padding-bottom: 8px;
+    background-size: 22px;
+}
+
+.percent-bar.sensor_error {
+    background-color: grey;
+}
+
+.water-tank input:read-only {
+    border: none;
+}
+
+#water_tank_table .water-tank-label {
+    font-weight: bold;
+    color: #333;
+}
+
+#water_tank_table .last_updated {
+    font-size: 0.92em;
+    color: rgb(70,70,70);
+}
+
+#water_tank_table h4.sensor_error {
+    background-image: url('/static/images/warning-icon24x24.png');
+    background-repeat: no-repeat;
+    padding-bottom: 24px;
+    margin: auto;
+    width: 27px;
+    display: block!important;
+}
