@@ -1,8 +1,17 @@
-$def with(settings, pnames, water_tank_id)
+$def with(settings, defaults, pnames, water_tank_id)
 
 $var title: $_('SIP Water-Tank Plugin')
 $var page: water_tank_plugin  
 <script>
+function decode(str) {
+
+let txt = new DOMParser().parseFromString(str, "text/html");
+
+return txt.documentElement.textContent;
+
+}
+    var defaults = JSON.parse(decode("$defaults"));
+    console.log(defaults);
     var water_tank_data;
     
     // Initialize behaviors
@@ -16,9 +25,16 @@ $var page: water_tank_plugin
         jQuery("#cUpdate").click(function() {
             if(jQuery("#original_water_tank_id").val().trim().length === 0)
             {
-                alert("$_('No water tank will be updated because no water tank was selected.')");
+                if(!confirm("$_('No water tank will be updated because no water tank was selected.')"))
+                {
+                    return;
+                }
+                jQuery("#action").val("update");            
+                jQuery("#pluginForm")[0].submit(); // to avoid validation of tank data fields
+                return;
             }
-            jQuery("#action").val("update");
+
+            jQuery("#action").val("update");            
             jQuery("#pluginForm").submit();
         });
 
@@ -149,7 +165,6 @@ $var page: water_tank_plugin
         jQuery("#original_water_tank_id").val(water_tank.id);
         jQuery("#label").val(water_tank.label);
         jQuery("#enabled").prop('checked', water_tank.enabled);
-        // jQuery("input[name=type][value=" + water_tank.type + "]").prop('checked', true);
         jQuery("input[name=type][value=" + water_tank.type + "]").click();
 
         jQuery("#width").val(water_tank.width);
@@ -160,6 +175,7 @@ $var page: water_tank_plugin
         jQuery("#vertical_axis").val(water_tank.vertical_axis);
         
         jQuery("#sensor_mqtt_topic").val(water_tank.sensor_mqtt_topic);
+        jQuery("#sensor_id").val(water_tank.sensor_id);
         jQuery("#sensor_offset_from_top").val(water_tank.sensor_offset_from_top);
         jQuery("#min_valid_sensor_measurement").val(water_tank.min_valid_sensor_measurement);
         jQuery("#max_valid_sensor_measurement").val(water_tank.max_valid_sensor_measurement);
@@ -169,28 +185,31 @@ $var page: water_tank_plugin
         jQuery("#percentage").val(Math.round(water_tank.percentage));
 
         jQuery("#overflow_level").val(water_tank.overflow_level);
-        jQuery("#overflow_email").val(water_tank.overflow_email);
-        jQuery("#overflow_xmpp").val(water_tank.overflow_xmpp);
+        jQuery("#overflow_email").prop('checked', water_tank.overflow_email);
+        jQuery("#overflow_xmpp").prop('checked', water_tank.overflow_xmpp);
         jQuery("#overflow_safe_level").val(water_tank.overflow_safe_level);
         $for pn in pnames:
             jQuery("#overflow_program_$pn").prop('checked', water_tank.overflow_programs["$pn"]);
         
         jQuery("#warning_level").val(water_tank.warning_level);
-        jQuery("#warning_email").val(water_tank.warning_email);
-        jQuery("#warning_xmpp").val(water_tank.warning_xmpp);        
+        jQuery("#warning_email").prop('checked', water_tank.warning_email);
+        jQuery("#warning_xmpp").prop('checked', water_tank.warning_xmpp);        
         $for pn in pnames:
             jQuery("#warning_suspend_program_$pn").prop('checked', water_tank.warning_suspend_programs[$pn]);
         $for pn in pnames:
             jQuery("#warning_activate_program_$pn").prop('checked', water_tank.warning_activate_programs[$pn]);
         
         jQuery("#critical_level").val(water_tank.critical_level);
-        jQuery("#critical_email").val(water_tank.critical_email);
-        jQuery("#critical_xmpp").val(water_tank.critical_xmpp);
+        jQuery("#critical_email").prop('checked', water_tank.critical_email);
+        jQuery("#critical_xmpp").prop('checked', water_tank.critical_xmpp);
         $for pn in pnames:
             jQuery("#critical_suspend_program_$pn").prop('checked', water_tank.critical_suspend_programs[$pn]);
         $for pn in pnames:
             jQuery("#critical_activate_program_$pn").prop('checked', water_tank.critical_activate_programs[$pn]);
-        
+
+        jQuery("#loss_email").prop('checked', water_tank.loss_email);
+        jQuery("#loss_xmpp").prop('checked', water_tank.loss_xmpp);
+
         jQuery("button#cDelete").prop('disabled', false);
         let x = jQuery("input[name='type']:checked");
     }
@@ -251,6 +270,52 @@ $var page: water_tank_plugin
             <label>$_('Data-Publish Topic'):</label><input type="text" id="data_publish_mqtt_topic" name="data_publish_mqtt_topic" value="$settings['data_publish_mqtt_topic']"/>
         </fieldset>
         <hr>
+        <h3>XMPP</h3>
+        <p class="info">$_('SIP will send XMPP messages for invalid-sensor-measurement, overflow, warning, critical, and water-loss events. For overflow, warning, and critical events messages will be resent only after the water level has crossed back above the event level.')</p>
+        <fieldset class="two-col">
+            <label>$_('Username'):</label><input type="text" id="xmpp_username" name="xmpp_username" value="$settings['xmpp_username']"/>
+            <label>$_('Password'):</label><input type="text" id="xmpp_password" name="xmpp_password" value="$settings['xmpp_password']"/>
+            <label>$_('Server'):</label><input type="text" id="xmpp_server" name="xmpp_server" value="$settings['xmpp_server']"/>
+            <label>$_('Subject'):</label><input type="text" id="xmpp_subject" name="xmpp_subject" value="$settings['xmpp_subject']"/>
+            <label>$_('Recipients'):</label><input type="text" id="xmpp_recipients" name="xmpp_recipients" value="$settings['xmpp_recipients']"/>
+            <div>
+                <label>$_('Unassociated-Sensor message'):</label>
+                <button type="button" class="reset" onclick='jQuery("#xmpp_unassociated_sensor_msg").val(defaults.xmpp_unassociated_sensor_msg);'>&#x21bb;</button>
+            </div>
+            <textarea id="xmpp_unassociated_sensor_msg" name="xmpp_unassociated_sensor_msg">$settings['xmpp_unassociated_sensor_msg']</textarea>
+                
+            <div>
+                <label>$_('Invalid Sensor Measurement message'):</label>
+                <button type="button" class="reset" onclick="jQuery('#xmpp_invalid_sensor_measurement_msg').val(defaults.xmpp_invalid_sensor_measurement_msg);">&#x21bb;</button>
+            </div>
+            <textarea id="xmpp_invalid_sensor_measurement_msg" name="xmpp_invalid_sensor_measurement_msg">$settings['xmpp_invalid_sensor_measurement_msg']</textarea>
+            
+            <div>
+                <label>$_('Overflow message'):</label>
+                <button type="button" class="reset" onclick="jQuery('#xmpp_overflow_msg').val(defaults.xmpp_overflow_msg);">&#x21bb;</button>
+            </div>
+            <textarea id="xmpp_overflow_msg" name="xmpp_overflow_msg">$settings['xmpp_overflow_msg']</textarea>
+                
+            <div>
+                <label>$_('Warning message'):</label>
+                <button type="button" class="reset" onclick="jQuery('#xmpp_warning_msg').val(defaults.xmpp_warning_msg);">&#x21bb;</button>
+            </div>
+            <textarea id="xmpp_warning_msg" name="xmpp_warning_msg">$settings['xmpp_warning_msg']</textarea>
+                
+            <div>
+                <label>$_('Critical message'):</label>
+                <button type="button" class="reset" onclick="jQuery('#xmpp_critical_msg').val(defaults.xmpp_critical_msg);">&#x21bb;</button>
+            </div>
+            <textarea id="xmpp_critical_msg" name="xmpp_critical_msg">$settings['xmpp_critical_msg']</textarea>
+                
+            <div>
+                <label>$_('Water Loss message'):</label>
+                <button type="button" class="reset" onclick="jQuery('#water_loss_msg').val(defaults.water_loss_msg);">&#x21bb;</button>
+            </div>
+            <textarea id="water_loss_msg" name="water_loss_msg">$settings['water_loss_msg']</textarea>
+                
+        </fieldset>
+        <hr>
         <h3>$_('Water Tanks')</h3>
         <p class="info">Add, Edit, and Delete water tank records</p>
         <table>
@@ -296,11 +361,12 @@ $var page: water_tank_plugin
             <label>$_('Horizontal Axis'):</label><div><input type=number min=0 id="horizontal_axis" name="horizontal_axis" value=""/></div>
             <label>$_('Vertical Axis'):</label><div><input type=number min=0 id="vertical_axis" name="vertical_axis" value=""/></div>
             <label>$_('Sensor Mqtt Topic'):</label><div><input type=text id="sensor_mqtt_topic" name="sensor_mqtt_topic" value=""/></div>
+            <label>$_('Sensor ID'):</label><div><input type=text id="sensor_id" name="sensor_id" required/></div>
             <label>$_('Sensor offset from top'):</label><div><input type=number id="sensor_offset_from_top" name="sensor_offset_from_top" value="0.0" required/></div>
             <label>$_('Min valid sesnor measurment'):</label><div><input type=number id="min_valid_sensor_measurement" name="min_valid_sensor_measurement" value=""/></div>
             <label>$_('Max valid sensor measurment'):</label><div><input type=number id="max_valid_sensor_measurement" name="max_valid_sensor_measurement" value=""/></div>
             <label>$_('Sensor measurment'):</label><div><input type=number id="sensor_measurement" name="sensor_measurement" value=""readonly/></div>
-            <label>$_('Invalid sensor measurment'):</label><div><img src="/static/images/warning-icon24x24.png" id="invalid_sensor_measurement" name="invalid_sensor_measurement" style="visibility:hidden"/></div>
+            <label>$_('Invalid sensor measurement'):</label><div><img src="/static/images/warning-icon24x24.png" id="invalid_sensor_measurement" name="invalid_sensor_measurement" style="visibility:hidden"/></div>
             <label>$_('Last updated'):</label><div><input type=text id="last_updated" name="last_updated" value="" readonly/></div>
             <label>$_('Full %'):</label><div><input type=number id="percentage" name="percentage" value="" readonly/></div>
             <label>$_('Enabled'):</label><div><input type="checkbox" id="enabled" name="enabled"/></div>
@@ -311,8 +377,10 @@ $var page: water_tank_plugin
         <fieldset class="two-col">            
             <label>$_('Overflow Level'):</label><div><input id="overflow_level" name="overflow_level" type=number min=0 max=100/></div>
             <label>$_('Safe level'):</label><div><input id="overflow_safe_level" name="overflow_safe_level" type=number min=0 max=100/></div>
-            <label>$_('Email'):</label><div><input id="overflow_email" name="overflow_email" type="email"/></div>
-            <label>$_('Xmpp'):</label><input id="overflow_xmpp" name="overflow_xmpp" type="text"/>
+            <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
+                <label>Email<input id="overflow_email" name="overflow_email" type="checkbox"/></label>
+                <label>Xmpp<input id="overflow_xmpp" name="overflow_xmpp" type="checkbox"/></label>
+            </div>
             <label>$_('Run Programs'):</label><div style="display:flex; flex-wrap: wrap;">
                 $for pn in pnames:
                     <label>$pn<input id="overflow_program_$pn" name="overflow_program_$pn" type="checkbox"/></label>
@@ -323,8 +391,10 @@ $var page: water_tank_plugin
         <p class="info">$_('Define at what % level a warning occurs, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">
             <label>$_('Level'):</label><div><input id="warning_level" name="warning_level" type=number min=0 max=100/></div>
-            <label>$_('Email'):</label><div><input id="warning_email" name="warning_email" type="email"/></div>
-            <label>$_('Xmpp'):</label><input id="warning_xmpp" name="warning_xmpp" type="text"/>
+            <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
+                <label>Email<input id="warning_email" name="warning_email" type="checkbox"/></label>
+                <label>Xmpp<input id="warning_xmpp" name="warning_xmpp" type="checkbox"/></label>
+            </div>
             <label>$_('Suspend Programs'):</label><div style="display:flex; flex-wrap: wrap;">
                 $for pn in pnames:
                     <label>$pn<input id="warning_suspend_program_$pn" name="warning_suspend_program_$pn" type="checkbox"/></label>
@@ -339,8 +409,10 @@ $var page: water_tank_plugin
         <p class="info">$_('Define which % level is critical, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">
             <label>$_('Level'):</label><div><input id="critical_level" name="critical_level" type=number min=0 max=100/></div>
-            <label>$_('Email'):</label><div><input id="critical_email" name="critical_email" type="email"/></div>
-            <label>$_('Xmpp'):</label><input id="critical_xmpp" name="critical_xmpp" type="text"/>
+            <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
+                <label>Email<input id="critical_email" name="critical_email" type="checkbox"/></label>
+                <label>Xmpp<input id="critical_xmpp" name="critical_xmpp" type="checkbox"/></label>
+            </div>
             <label>$_('Suspend Programs'):</label><div style="display:flex; flex-wrap: wrap;">
                 $for pn in pnames:
                     <label>$pn<input id="critical_suspend_program_$pn" name="critical_suspend_program_$pn" type="checkbox"/></label>
@@ -354,8 +426,11 @@ $var page: water_tank_plugin
         <h4>$_('Water Loss')</h4>
         <p class="info">$_('When sensors report decreasing water level but no valves are open, water is leaking or being stolen. Specify which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">
-            <label>$_('Email'):</label><input id="loss_email" name="loss_email" type="text"/>
-            <label>$_('Xmpp'):</label><input id="loss_xmpp" name="loss_xmpp" type="text"/>
+            <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
+                <label>Email<input id="loss_email" name="loss_email" type="checkbox"/></label>
+                <label>Xmpp<input id="loss_xmpp" name="loss_xmpp" type="checkbox"/></label>
+            </div>
+            
         </fieldset>  
         </br>
     </form>

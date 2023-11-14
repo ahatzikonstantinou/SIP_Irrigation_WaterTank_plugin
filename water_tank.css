@@ -98,6 +98,19 @@ form.water-tank input{
     color: #009879;
 }
 
+.water-tank textarea {
+    height: 5em;
+    width: 97%;
+    display: block;
+}
+
+.water-tank button.reset {
+    display: block;
+    margin: 2px;
+    font-size: large;
+    background-color: lightskyblue;
+}
+
 /* Classes used for water_tank.html form validation */
 .error {
     border: 2px solid #f00;

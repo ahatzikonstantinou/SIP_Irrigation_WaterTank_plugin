@@ -4,16 +4,16 @@ Author: Antonios Hatzikonstantinou
 Email: ahatzikonsntantinou@protonmail.com
 License: GNU GPL 3.0
 
-Requirements: mqtt
+Requirements: mqtt, xmpppy
 
 ##### List all plugin files below preceded by a blank line [file_name.ext path] relative to SIP directory #####
 
 water_tank.py plugins
 water_tank.html templates
+water_tank.css static/css
 water_tank.js static/scripts
 additional-methods.min.js static/scripts
 jquery.validate.min.js static/scripts
 mqttws31.js static/scripts
-water_tank.css static/css
 warning-icon24x24.png static/images
 water_tank.manifest plugins/manifests
