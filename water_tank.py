@@ -71,12 +71,15 @@ class WaterTank(ABC):
         if (self.min_valid_sensor_measurement is not None and measurement < self.min_valid_sensor_measurement) or (self.max_valid_sensor_measurement is not None and measurement > self.max_valid_sensor_measurement):
             self.invalid_sensor_measurement = True
             self.percentage = None
-            xmpp_send_invalid_measurement_msg(self, "type{}, min_valid_sensor_measurement:'{}', max_valid_sensor_measurement:'{}'".format(self.type.name, self.min_valid_sensor_measurement, self.max_valid_sensor_measurement))
+            xmpp_send_invalid_measurement_msg(self, self.AdditionalInfo4Msg())
             
             return False
 
         self.invalid_sensor_measurement = False
         return True
+
+    def AdditionalInfo4Msg(self):
+        return "type: {}, min_valid_sensor_measurement: '{}', max_valid_sensor_measurement: '{}'".format(WaterTankType(self.type).name, self.min_valid_sensor_measurement, self.max_valid_sensor_measurement)
         
 
 class WaterTankRectangular(WaterTank):
@@ -92,18 +95,19 @@ class WaterTankRectangular(WaterTank):
         
         if self.width is not None and self.length is not None and self.height is not None:
             volume = self.width * self.length * self.height
-            self.percentage = 100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height
+            self.percentage = round(100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height)
             if self.height < (measurement-self.sensor_offset_from_top):
                 self.invalid_sensor_measurement = True
-                xmpp_send_msg(settings[XMPP_INVALID_SENSOR_MEASUREMENT_MSG].format(
-                water_tank_id = self.id,
-                water_tank_label = self.label,
-                sensor_id = self.sensor_id,
-                measurement = measurement,
-                date = self.last_updated,
-                mqtt_topic = self.sensor_mqtt_topic,
-                additional_info = "type{}, min_valid_sensor_measurement:'{}', max_valid_sensor_measurement:'{}'".format(self.type.name, self.min_valid_sensor_measurement, self.max_valid_sensor_measurement)
-            ))
+                xmpp_send_msg( _settings[XMPP_INVALID_SENSOR_MEASUREMENT_MSG].format(
+                    water_tank_id = self.id,
+                    water_tank_label = self.label,
+                    sensor_id = self.sensor_id,
+                    percentage = self.percentage,
+                    measurement = measurement,
+                    last_updated = self.last_updated,
+                    mqtt_topic = self.sensor_mqtt_topic,
+                    additional_info = self.AdditionalInfo4Msg()
+                ))
                 return False
         
         return True
@@ -126,7 +130,7 @@ class WaterTankCylindricalHorizontal(WaterTank):
                 self.invalid_sensor_measurement = True
             try:
                 liquid_volume = acos((r-h)/r)*(r**2) - (r-h)*sqrt(2*r*h - (h**2))
-                self.percentage = 100.0 * liquid_volume / volume
+                self.percentage = round(100.0 * liquid_volume / volume)
             except:
                 self.invalid_sensor_measurement = True
                 self.percentage = None
@@ -147,7 +151,7 @@ class WaterTankCylindricalVertical(WaterTank):
         
         if self.diameter is not None and self.height is not None:
             volume = self.diameter * self.height
-            self.percentage = 100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height
+            self.percentage = round(100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height)
 
             if self.height < (measurement-self.sensor_offset_from_top):
                 self.invalid_sensor_measurement = True
@@ -179,7 +183,7 @@ class WaterTankElliptical(WaterTank):
 
             try:
                 liquid_volume = ((A*B*L)/4)*( acos(1.0 - 2.0*H/A) - (1.0 - 2.0*H/A)*sqrt(4*H/A - 4*(H**2)/(A**2)) )
-                self.percentage = 100.0 * liquid_volume / volume
+                self.percentage = round(100.0 * liquid_volume / volume)
             except:
                 self.invalid_sensor_measurement = True
                 self.percentage = None
@@ -189,7 +193,7 @@ class WaterTankElliptical(WaterTank):
 
 
 class WaterTankFactory():
-    def FromDict(d):
+    def FromDict(d, addSettingsProperties = True):
         wt = None
         type = int(d["type"])
 
@@ -219,22 +223,22 @@ class WaterTankFactory():
                 None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
                 ("enabled" in d),
                 None if not d["overflow_level"] else float(d["overflow_level"]),
-                True if ('overflow_email') in d else False,
-                True if ('overflow_xmpp') in d else False,
+                True if 'overflow_email' in d else False,
+                True if 'overflow_xmpp' in d else False,
                 None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
                 overflow_programs,
                 None if not d["warning_level"] else float(d["warning_level"]),
-                True if ('warning_email') in d else False,
-                True if ('warning_xmpp') in d else False,
+                True if 'warning_email' in d else False,
+                True if 'warning_xmpp' in d else False,
                 warning_suspend_programs,
                 warning_activate_programs,
                 None if not d["critical_level"] else float( d["critical_level"]),
-                True if ('critical_email') in d else False,
-                True if ('critical_xmpp') in d else False,
+                True if 'critical_email' in d else False,
+                True if 'critical_xmpp' in d else False,
                 critical_suspend_programs,
                 critical_activate_programs,
-                True if ('loss_email') in d else False,
-                True if ('loss_xmpp') in d else False
+                True if 'loss_email' in d else False,
+                True if 'loss_xmpp' in d else False
             )
         elif type == WaterTankType.CYLINDRICAL_HORIZONTAL.value:
             wt = WaterTankCylindricalHorizontal(
@@ -249,22 +253,22 @@ class WaterTankFactory():
                 None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
                 ("enabled" in d),
                 None if not d["overflow_level"] else float(d["overflow_level"]),
-                True if ('overflow_email') in d else False,
-                True if ('overflow_xmpp') in d else False,
+                True if 'overflow_email' in d else False,
+                True if 'overflow_xmpp' in d else False,
                 None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
                 overflow_programs,
                 None if not d["warning_level"] else float(d["warning_level"]),
-                True if ('warning_email') in d else False,
-                True if ('warning_xmpp') in d else False,
+                True if 'warning_email' in d else False,
+                True if 'warning_xmpp' in d else False,
                 warning_suspend_programs,
                 warning_activate_programs,
                 None if not d["critical_level"] else float( d["critical_level"]),
-                True if ('critical_email') in d else False,
-                True if ('critical_xmpp') in d else False,
+                True if 'critical_email' in d else False,
+                True if 'critical_xmpp' in d else False,
                 critical_suspend_programs,
                 critical_activate_programs,
-                True if ('loss_email') in d else False,
-                True if ('loss_xmpp') in d else False
+                True if 'loss_email' in d else False,
+                True if 'loss_xmpp' in d else False
             )
         elif type == WaterTankType.CYLINDRICAL_VERTICAL.value:
             wt = WaterTankCylindricalVertical(
@@ -279,22 +283,22 @@ class WaterTankFactory():
                 None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
                 ("enabled" in d),
                 None if not d["overflow_level"] else float(d["overflow_level"]),
-                True if ('overflow_email') in d else False,
-                True if ('overflow_xmpp') in d else False,
+                True if 'overflow_email' in d else False,
+                True if 'overflow_xmpp' in d else False,
                 None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
                 overflow_programs,
                 None if not d["warning_level"] else float(d["warning_level"]),
-                True if ('warning_email') in d else False,
-                True if ('warning_xmpp') in d else False,
+                True if 'warning_email' in d else False,
+                True if 'warning_xmpp' in d else False,
                 warning_suspend_programs,
                 warning_activate_programs,
                 None if not d["critical_level"] else float( d["critical_level"]),
-                True if ('critical_email') in d else False,
-                True if ('critical_xmpp') in d else False,
+                True if 'critical_email' in d else False,
+                True if 'critical_xmpp' in d else False,
                 critical_suspend_programs,
                 critical_activate_programs,
-                True if ('loss_email') in d else False,
-                True if ('loss_xmpp') in d else False
+                True if 'loss_email' in d else False,
+                True if 'loss_xmpp' in d else False
             )
         elif type == WaterTankType.ELLIPTICAL.value:
             wt = WaterTankElliptical(
@@ -310,24 +314,31 @@ class WaterTankFactory():
                 None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
                 ("enabled" in d),
                 None if not d["overflow_level"] else float(d["overflow_level"]),
-                True if ('overflow_email') in d else False,
-                True if ('overflow_xmpp') in d else False,
+                True if 'overflow_email' in d else False,
+                True if 'overflow_xmpp' in d else False,
                 None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
                 overflow_programs,
                 None if not d["warning_level"] else float(d["warning_level"]),
-                True if ('warning_email') in d else False,
-                True if ('warning_xmpp') in d else False,
+                True if 'warning_email' in d else False,
+                True if 'warning_xmpp' in d else False,
                 warning_suspend_programs,
                 warning_activate_programs,
                 None if not d["critical_level"] else float( d["critical_level"]),
-                True if ('critical_email') in d else False,
-                True if ('critical_xmpp') in d else False,
+                True if 'critical_email' in d else False,
+                True if 'critical_xmpp' in d else False,
                 critical_suspend_programs,
                 critical_activate_programs,
-                True if ('loss_email') in d else False,
-                True if ('loss_xmpp') in d else False
+                True if 'loss_email' in d else False,
+                True if 'loss_xmpp' in d else False
             )
         
+        if(addSettingsProperties):
+            settings = get_settings()
+            if( wt.id in settings["water_tanks"]):
+                wt.last_updated = settings["water_tanks"][wt.id]["last_updated"]
+                wt.sensor_measurement = settings["water_tanks"][wt.id]["sensor_measurement"]
+                wt.invalid_sensor_measurement = settings["water_tanks"][wt.id]["invalid_sensor_measurement"]
+                wt.percentage = settings["water_tanks"][wt.id]["percentage"]
         return wt
 
 
@@ -355,12 +366,12 @@ _settings = {
     XMPP_SERVER: u"ahat1.duckdns.org",
     XMPP_SUBJECT: u"SIP",
     XMPP_RECIPIENTS: u"ahat@ahat1.duckdns.org",
-    XMPP_UNASSOCIATED_SENSOR_MSG: u"Unassociated sensor measurement msg! sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{date}', mqtt topic:'{mqtt_topic}",
-    XMPP_INVALID_SENSOR_MEASUREMENT_MSG: u"Invalid sensor measurement! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}. Additional info:[{additional_info}]",
-    XMPP_OVERFLOW_MSG: u"Overflow! water tank:'{water_tank_id}'/'{water_tank_label}, sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}",
-    XMPP_WARNING_MSG: u"Warning! water tank:'{water_tank_id}'/'{water_tank_label}, sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}",
-    XMPP_CRITICAL_MSG: u"Critical! water tank:'{water_tank_id}'/'{water_tank_label}, sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}",
-    XMPP_WATER_LOSS_MSG: u"Water loss! water tank:'{water_tank_id}'/'{water_tank_label}, sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}",
+    XMPP_UNASSOCIATED_SENSOR_MSG: u"Unassociated sensor measurement msg! sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'",
+    XMPP_INVALID_SENSOR_MEASUREMENT_MSG: u"Invalid sensor measurement! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
+    XMPP_OVERFLOW_MSG: u"Overflow! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
+    XMPP_WARNING_MSG: u"Warning! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
+    XMPP_CRITICAL_MSG: u"Critical! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
+    XMPP_WATER_LOSS_MSG: u"Water loss! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
     
     u"water_tanks": {
         "water_tank_1": {
@@ -599,12 +610,12 @@ _settings = {
 
 
 defaults = {
-    XMPP_UNASSOCIATED_SENSOR_MSG: u"Unassociated sensor measurement msg! sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{date}', mqtt topic:'{mqtt_topic}",
-    XMPP_INVALID_SENSOR_MEASUREMENT_MSG: u"Invalid sensor measurement! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}. Additional info:[{additional_info}]",
-    XMPP_OVERFLOW_MSG: u"Overflow! water tank:'{water_tank_id}'/'{water_tank_label}, sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}",
-    XMPP_WARNING_MSG: u"Warning! water tank:'{water_tank_id}'/'{water_tank_label}, sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}",
-    XMPP_CRITICAL_MSG: u"Critical! water tank:'{water_tank_id}'/'{water_tank_label}, sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}",
-    XMPP_WATER_LOSS_MSG: u"Water loss! water tank:'{water_tank_id}'/'{water_tank_label}, sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}"
+    XMPP_UNASSOCIATED_SENSOR_MSG: u"Unassociated sensor measurement msg! sensor_id:'{sensor_id}', measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'",
+    XMPP_INVALID_SENSOR_MEASUREMENT_MSG: u"Invalid sensor measurement! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
+    XMPP_OVERFLOW_MSG: u"Overflow! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
+    XMPP_WARNING_MSG: u"Warning! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
+    XMPP_CRITICAL_MSG: u"Critical! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
+    XMPP_WATER_LOSS_MSG: u"Water loss! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]"
 }
 
 
@@ -612,7 +623,8 @@ defaults = {
 # fmt: off
 urls.extend([
     u"/water-tank-sp", u"plugins.water_tank.settings",
-    u"/water-tank-save", u"plugins.water_tank.save_settings",
+    u"/water-tank-save-settings", u"plugins.water_tank.save_settings",
+    u"/water-tank-save-water-tanks", u"plugins.water_tank.save_water_tanks",
     u"/water-tank-get-all", u"plugins.water_tank.get_all",
     u"/water-tank-get_mqtt_settings", u"plugins.water_tank.get_mqtt_settings",
     u"/water-tank-delete", u"plugins.water_tank.delete"
@@ -725,7 +737,24 @@ def readWaterTankData():
     return water_tank_data  # open settings page
 
 
+def no_stations_are_on():
+    print("gv.srvals: {}, open valve exists: {}".format(''.join(str(gv.srvals)), (1 in gv.srvals)))
+    return 1 not in gv.srvals
+
+
+def get_xmpp_receipients():
+    """
+    Returns a list of recipients for xmpp messages
+    """
+    settings = get_settings()
+    if "," not in settings[XMPP_RECIPIENTS]:
+        return [settings[XMPP_RECIPIENTS]]
+
+    return [s.strip() for s in settings[XMPP_RECIPIENTS].split(", ")]
+
+
 def xmpp_send_msg(message):
+    print("Will try to send message '{}'".format(message))
     settings = get_settings()
 
     if( (not(settings[XMPP_USERNAME] and not settings[XMPP_USERNAME].isspace())) or
@@ -742,7 +771,7 @@ def xmpp_send_msg(message):
     if not con:
         print('could not connect!')
         return False
-    print('connected with {}'.format(con))
+    print('connected with {} to {} with user {}'.format(con, settings[XMPP_SERVER], settings[XMPP_USERNAME]))
     auth = cl.auth( jid.getNode(), settings[XMPP_PASSWORD], resource = jid.getResource() )
     if not auth:
         print('could not authenticate!')
@@ -750,9 +779,9 @@ def xmpp_send_msg(message):
     print('authenticated using {}'.format(auth) )
 
     #cl.SendInitPresence(requestRoster=0)   # you may need to uncomment this for old server
-    for r in settings[XMPP_RECIPIENTS]:
+    for r in get_xmpp_receipients():
         id = cl.send(xmpp.protocol.Message( r, message ) )
-        print('sent message with id {}'.format(id) )
+        print('sent message with id {} to {}'.format(id, r) )
 
 
 def xmpp_send_invalid_measurement_msg(water_tank, additional_info):
@@ -760,8 +789,9 @@ def xmpp_send_invalid_measurement_msg(water_tank, additional_info):
         water_tank_id = water_tank.id,
         water_tank_label = water_tank.label,
         sensor_id = water_tank.sensor_id,
+        percentage = water_tank.percentage,
         measurement = water_tank.sensor_measurement,
-        date = water_tank.last_updated,
+        last_updated = water_tank.last_updated,
         mqtt_topic = water_tank.sensor_mqtt_topic,
         additional_info = additional_info
     ))
@@ -769,6 +799,9 @@ def xmpp_send_invalid_measurement_msg(water_tank, additional_info):
 
 def xmpp_check_events_and_send_msg(cmd, percentageBefore, water_tank, msg):
     percentage = water_tank.percentage
+    print("Checking events for percentageBefore:'{}', percentage:'{}', water-tank:'{}' ".format(
+        percentageBefore, percentage, water_tank.label
+    ))
     if percentage is None:
         return
     
@@ -776,45 +809,72 @@ def xmpp_check_events_and_send_msg(cmd, percentageBefore, water_tank, msg):
     if( water_tank.overflow_xmpp and
         water_tank.overflow_level is not None and 
         water_tank.percentage is not None and
-        water_tank.percentage > water_tank.overflow_level and  
-        (percentageBefore is None or percentageBefore <= water_tank.overflow_level) 
+        water_tank.percentage >= water_tank.overflow_level and  
+        (percentageBefore is None or percentageBefore < water_tank.overflow_level) 
       ):
+        print("Will send xmpp overflow message")
         xmpp_send_msg( settings[XMPP_OVERFLOW_MSG].format(
             water_tank_id = water_tank.id,
             water_tank_label = water_tank.label,
             sensor_id = water_tank.sensor_id,
-            measurement = water_tank.measurement,
+            percentage = water_tank.percentage,
+            measurement = water_tank.sensor_measurement,
             last_updated = water_tank.last_updated,
-            mqtt_topic = msg.topic
+            mqtt_topic = msg.topic,
+            additional_info = water_tank.AdditionalInfo4Msg()
         ))
 
     if( water_tank.critical_xmpp and
         water_tank.critical_level is not None and 
         water_tank.percentage is not None and
-        water_tank.percentage < water_tank.critical_level and  
-        (percentageBefore is None or percentageBefore >= water_tank.critical_level) 
+        water_tank.percentage <= water_tank.critical_level and  
+        (percentageBefore is None or percentageBefore > water_tank.critical_level) 
       ):
-        xmpp_send_msg( settings[XMPP_OVERFLOW_MSG].format(
+        print("Will send xmpp critical message")
+        xmpp_send_msg( settings[XMPP_CRITICAL_MSG].format(
             water_tank_id = water_tank.id,
             water_tank_label = water_tank.label,
             sensor_id = water_tank.sensor_id,
-            measurement = water_tank.measurement,
+            percentage = water_tank.percentage,
+            measurement = water_tank.sensor_measurement,
             last_updated = water_tank.last_updated,
-            mqtt_topic = msg.topic
+            mqtt_topic = msg.topic,
+            additional_info = water_tank.AdditionalInfo4Msg()
         ))
     elif( water_tank.warning_xmpp and
         water_tank.warning_level is not None and 
         water_tank.percentage is not None and
-        water_tank.percentage < water_tank.warning_level and  
-        (percentageBefore is None or percentageBefore >= water_tank.warning_level) 
+        water_tank.percentage <= water_tank.warning_level and  
+        (percentageBefore is None or percentageBefore > water_tank.warning_level) 
       ):
-        xmpp_send_msg( settings[XMPP_OVERFLOW_MSG].format(
+        print("Will send xmpp warning message")
+        xmpp_send_msg( settings[XMPP_WARNING_MSG].format(
             water_tank_id = water_tank.id,
             water_tank_label = water_tank.label,
             sensor_id = water_tank.sensor_id,
-            measurement = water_tank.measurement,
+            percentage = water_tank.percentage,
+            measurement = water_tank.sensor_measurement,
             last_updated = water_tank.last_updated,
-            mqtt_topic = msg.topic
+            mqtt_topic = msg.topic,
+            additional_info = water_tank.AdditionalInfo4Msg()
+        ))
+
+    # print("Will check water loss water_tank.loss_xmpp: {}, water_tank.percentage: {}, percentageBefore: {}, water_tank.percentage: {}".format(water_tank.loss_xmpp, water_tank.percentage, percentageBefore, water_tank.percentage))
+    if( water_tank.loss_xmpp and
+        water_tank.percentage is not None and 
+        (percentageBefore is not None and percentageBefore > water_tank.percentage) and
+        no_stations_are_on()
+        ):
+        print("Will send xmpp water loss message")
+        xmpp_send_msg( settings[XMPP_WATER_LOSS_MSG].format(
+            water_tank_id = water_tank.id,
+            water_tank_label = water_tank.label,
+            sensor_id = water_tank.sensor_id,
+            percentage = water_tank.percentage,
+            measurement = water_tank.sensor_measurement,
+            last_updated = water_tank.last_updated,
+            mqtt_topic = msg.topic,
+            additional_info = water_tank.AdditionalInfo4Msg()
         ))
 
 
@@ -825,7 +885,7 @@ def updateSensorMeasurementFromCmd(cmd, water_tanks, msg):
         xmpp_send_msg(settings[XMPP_UNASSOCIATED_SENSOR_MSG].format(
             sensor_id = cmd[u"sensor_id"],
             measurement = cmd[u"measurement"],
-            date = datetime.now().replace(microsecond=0),
+            last_updated = datetime.now().replace(microsecond=0),
             mqtt_topic = msg.topic
         ))
         return
@@ -834,7 +894,7 @@ def updateSensorMeasurementFromCmd(cmd, water_tanks, msg):
         wt = WaterTankFactory.FromDict(awt)
         percentageBefore = wt.percentage
         if wt.UpdateSensorMeasurement(cmd[u"sensor_id"], cmd[u"measurement"]):
-            water_tanks[cmd[u"id"]] = wt.__dict__
+            water_tanks[wt.id] = wt.__dict__
             xmpp_check_events_and_send_msg(cmd, percentageBefore, wt, msg)
             # print("Update water tank '{}' with measurment: {}".format(wt.id, wt.sensor_measurement))
             return True
@@ -857,36 +917,39 @@ def on_sensor_mqtt_message(client, msg):
         xmpp_send_msg(u"Unrecognized mqtt msg! MQTT topic:'{}', msg:[{}]".format(msg.topic, msg.payload))
         return
 
-    settings = get_settings()
-    water_tanks = settings[u"water_tanks"]
-    water_tank_updated = False
-    if isinstance(cmd, dict) and 'sensor_id' in cmd:
-        water_tank_updated = updateSensorMeasurementFromCmd(cmd, water_tanks. msg)
-    elif isinstance(cmd, list):
-        print('Cmd is a list')
-        for singleTankCmd in cmd:
-            print('Cmd item:{}'.format(json.dumps(singleTankCmd, default=serialize_datetime,indent=4)))
-            if isinstance(singleTankCmd, dict) and 'sensor_id' in singleTankCmd:
-                print("Will call updateSensorMeasurementFromCmd for sensor '{}'".format(singleTankCmd["sensor_id"]))
-                water_tank_updated = updateSensorMeasurementFromCmd(singleTankCmd, water_tanks, msg) or water_tank_updated
-            else:
-                print("Skipping sensor: {}".format(singleTankCmd["sensor_id"]))
-    else:
-        print("Unknown mqtt command {}".format(repr(cmd)))
-        xmpp_send_msg(u"Unrecognized mqtt msg! MQTT topic:'{}', msg:[{}]".format(msg.topic, msg.payload))
-        return
+    try:
+        settings = get_settings()
+        water_tanks = settings[u"water_tanks"]
+        water_tank_updated = False
+        if isinstance(cmd, dict) and 'sensor_id' in cmd:
+            water_tank_updated = updateSensorMeasurementFromCmd(cmd, water_tanks, msg)
+        elif isinstance(cmd, list):
+            print('Cmd is a list')
+            for singleTankCmd in cmd:
+                print('Cmd item:{}'.format(json.dumps(singleTankCmd, default=serialize_datetime,indent=4)))
+                if isinstance(singleTankCmd, dict) and 'sensor_id' in singleTankCmd:
+                    print("Will call updateSensorMeasurementFromCmd for sensor '{}'".format(singleTankCmd["sensor_id"]))
+                    water_tank_updated = updateSensorMeasurementFromCmd(singleTankCmd, water_tanks, msg) or water_tank_updated
+                else:
+                    print("Skipping sensor: {}".format(singleTankCmd["sensor_id"]))
+        else:
+            print("Unknown mqtt command {}".format(repr(cmd)))
+            xmpp_send_msg(u"Unrecognized mqtt msg! MQTT topic:'{}', msg:[{}]".format(msg.topic, msg.payload))
+            return
 
-    if not water_tank_updated:
-        print("No water tank with cmd '{}' was updated.".format(cmd))
-        return
-    
-    settings[u"water_tanks"] = water_tanks
-    with open(DATA_FILE, u"w") as f:
-            json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file
+        if not water_tank_updated:
+            print("No water tank with cmd '{}' was updated.".format(cmd))
+            return
+        
+        settings[u"water_tanks"] = water_tanks
+        with open(DATA_FILE, u"w") as f:
+                json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file
 
-    client = mqtt.get_client()
-    if client:
-        client.publish(settings[WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC], json.dumps(water_tanks, default=serialize_datetime), qos=1, retain=True)
+        client = mqtt.get_client()
+        if client:
+            client.publish(settings[WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC], json.dumps(water_tanks, default=serialize_datetime), qos=1, retain=True)
+    except Exception as e:
+        print("An unexpected error occured", e)
 
 
 def on_data_request_mqtt_message(client, msg):
@@ -915,7 +978,7 @@ def subscribe_mqtt():
     #subscribe to sensor topics
     for wt in list( settings[u"water_tanks"].values() ):
         topic = wt[u"sensor_mqtt_topic"]
-        if topic:
+        if topic and topic not in mqtt._subscriptions:
             print("Subscribing to topic '{}'".format(topic))
             mqtt.subscribe(topic, on_sensor_mqtt_message, 2)
 
@@ -949,13 +1012,14 @@ class settings(ProtectedPage):
         except IOError:  # If file does not exist return empty value
             settings = _settings
 
+        show_settings = 'showSettings' in web.input()
         water_tank_id = None
         if 'water_tank_id' in web.input():
             water_tank_id = web.input()["water_tank_id"]
 
         # settings["water_tanks"] = settings["water_tanks"].values()        
         # print("Sending settings: {}".format(json.dumps(settings, default=serialize_datetime, indent=4)))
-        return template_render.water_tank(settings, json.dumps(defaults, ensure_ascii=False), gv.pnames, water_tank_id)  # open settings page
+        return template_render.water_tank(settings, json.dumps(defaults, ensure_ascii=False), gv.pnames, water_tank_id, show_settings)  # open settings page
 
 
 class save_settings(ProtectedPage):
@@ -986,6 +1050,26 @@ class save_settings(ProtectedPage):
         settings[XMPP_CRITICAL_MSG] = d[XMPP_CRITICAL_MSG]
         settings[XMPP_WATER_LOSS_MSG] = d[XMPP_WATER_LOSS_MSG]
         
+        with open(DATA_FILE, u"w") as f:
+            json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file
+        print('Saved settings: {}'.format(json.dumps(settings, default=serialize_datetime, indent=4)))
+
+        raise web.seeother(u"/water-tank-sp?showSettings") 
+
+class save_water_tanks(ProtectedPage):
+    """
+    Save user input to json file.
+    Will create or update file when SUBMIT button is clicked
+    CheckBoxes only appear in qdict if they are checked.
+    """
+
+    def POST(self):
+        d = (
+            web.input()
+        )  # Dictionary of values returned as query string from settings page.
+        print('Received: {}'.format(json.dumps(d, default=serialize_datetime, indent=4))) # for testing
+        settings = get_settings()
+        
         water_tank = WaterTankFactory.FromDict(d)
         original_water_tank_id = d[u"original_water_tank_id"]
         
@@ -1009,13 +1093,14 @@ class save_settings(ProtectedPage):
                 
         with open(DATA_FILE, u"w") as f:
             json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file
-        print('Saved: {}'.format(json.dumps(settings, default=serialize_datetime, indent=4)))
+        print('Saved water tanks: {}'.format(json.dumps(settings, default=serialize_datetime, indent=4)))
 
         if d[u"id"] and (d[u"action"] == "add" or (d[u"action"] == "update" and original_water_tank_id)):
             refresh_mqtt_subscriptions()
-            raise web.seeother(u"/water-tank-sp?water_tank_id=" + d[u"id"])  # Return user to home page.
+            raise web.seeother(u"/water-tank-sp?water_tank_id=" + d[u"id"])
         else:
-            raise web.seeother(u"/water-tank-sp")  # Return user to home page.
+            raise web.seeother(u"/water-tank-sp")
+
 
 
 class get_all(ProtectedPage):

@@ -1,4 +1,4 @@
-$def with(settings, defaults, pnames, water_tank_id)
+$def with(settings, defaults, pnames, water_tank_id, show_settings)
 
 $var title: $_('SIP Water-Tank Plugin')
 $var page: water_tank_plugin  
@@ -11,15 +11,21 @@ return txt.documentElement.textContent;
 
 }
     var defaults = JSON.parse(decode("$defaults"));
-    console.log(defaults);
+    // console.log(defaults);
     var water_tank_data;
     
     // Initialize behaviors
     jQuery(document).ready(function(){
 
+        jQuery("details").prop("open", ${"true" if show_settings else "false" });
+        jQuery("#cUpdateSettings").click(function() {
+            jQuery("#pluginFormSettings").valid();
+            // jQuery("#pluginFormSettings").submit();
+        });
+
         jQuery("#cAddNew").click(function() {
             jQuery("#original_water_tank_id").val("");            
-            jQuery("#pluginForm").submit();
+            jQuery("#pluginFormWaterTanks").submit();
         });
 
         jQuery("#cUpdate").click(function() {
@@ -30,17 +36,17 @@ return txt.documentElement.textContent;
                     return;
                 }
                 jQuery("#action").val("update");            
-                jQuery("#pluginForm")[0].submit(); // to avoid validation of tank data fields
+                jQuery("#pluginFormWaterTanks")[0].submit(); // to avoid validation of tank data fields
                 return;
             }
 
             jQuery("#action").val("update");            
-            jQuery("#pluginForm").submit();
+            jQuery("#pluginFormWaterTanks").submit();
         });
 
         jQuery("button#cDelete").click(function(){
-            jQuery("#pluginForm").attr('action', '/water-tank-delete');
-            jQuery("#pluginForm").submit();
+            jQuery("#pluginFormWaterTanks").attr('action', '/water-tank-delete');
+            jQuery("#pluginFormWaterTanks").submit();
         });
 
         jQuery("button#cCancel").click(function(){
@@ -63,6 +69,7 @@ return txt.documentElement.textContent;
                 jQuery("input[name=type][value=1]").click();
         });        
 
+        
         //
         // Register mqtt client to update water tank data based on incoming mqtt messages
         // Create a client instance
@@ -136,7 +143,48 @@ return txt.documentElement.textContent;
             }
         });
         
-        jQuery("#pluginForm").validate({
+               
+        jQuery.validator.addMethod("messageRule", function(value, element) {
+            let keywords = value.match(/{(.*?)}/g);    // capture all words between curly brackets, will include the curly brackets
+            const allowedKeywords = ["water_tank_id", "water_tank_label", "sensor_id", "percentage", "measurement", "last_updated", "mqtt_topic", "additional_info"];
+            
+            let excludeKeywordsStr = jQuery("#"+element.id).data("exclude-keywords");            
+            let excludeKeywords = [];
+            if( excludeKeywordsStr != null && excludeKeywordsStr.length > 0 )
+            {
+                excludeKeywords = excludeKeywordsStr.split(',');
+            }
+            
+            let invalidKeywords = [];
+            
+            console.log("Validating against valid keywords: {" + allowedKeywords.join("}, {") + "}" );
+            for(const kw of keywords)
+            {
+                let invalidKeywordFound = false;
+                let keyword = kw.substring(1, kw.length - 1); // remove the curly brackets
+                // console.log(`Index of $${keyword} in allowedKeywords is ` + allowedKeywords.indexOf(`$${keyword}`));
+                invalidKeywordFound = allowedKeywords.indexOf(`$${keyword}`) == -1 || excludeKeywords.indexOf(`$${keyword}`) != -1;
+                if( invalidKeywordFound )
+                {
+                    invalidKeywords.push(kw);
+                }
+            }
+            jQuery.validator.messages.messageRule = "Invalid keywords: " + invalidKeywords.join();
+            return this.optional(element) || (invalidKeywords.length == 0);
+        });
+
+        jQuery("#pluginFormSettings").validate({
+            rules: {
+                xmpp_unassociated_sensor_msg: { messageRule: true },
+                xmpp_invalid_sensor_measurement_msg: { messageRule: true },
+                xmpp_overflow_msg: { messageRule: true },
+                xmpp_warning_msg: { messageRule: true },
+                xmpp_critical_msg: { messageRule: true },
+                water_loss_msg: { messageRule: true }
+            }
+        });
+        
+        jQuery("#pluginFormWaterTanks").validate({
             rules: {
                 id: {
                     pattern: /^[a-zA-Z0-9_]+$$/
@@ -210,8 +258,8 @@ return txt.documentElement.textContent;
         jQuery("#loss_email").prop('checked', water_tank.loss_email);
         jQuery("#loss_xmpp").prop('checked', water_tank.loss_xmpp);
 
-        jQuery("button#cDelete").prop('disabled', false);
-        let x = jQuery("input[name='type']:checked");
+        jQuery("button#cUpdate").prop('disabled', false);        
+        jQuery("button#cDelete").prop('disabled', false);        
     }
 
     function typeSelected(type)
@@ -261,61 +309,101 @@ return txt.documentElement.textContent;
     <button class="execute" id="docButton" type="button" >$_('Help')</button>
     </div>
     <hr>
-    <form id="pluginForm" class="water-tank" action="/water-tank-save" method="post">
-        <h3>MQTT</h3>
-        <p class="info">$_('SIP will listen for incomming messages in the Subscribe topic. As soon as message arrives, SIP will publish all water tank data to the Publish topic. The broker ws port is required for the Paho javascript library, please note that for a broker like mosquitto this is a different listener port than the standard 1883.')</p>
-        <fieldset class="two-col">
-            <label>$_('Broker WS Port'):</label><input type="text" id="mqtt_broker_ws_port" name="mqtt_broker_ws_port" value="$settings['mqtt_broker_ws_port']"/>
-            <label>$_('Data-Request Subscribe Topic'):</label><input type="text" id="request_subscribe_mqtt_topic" name="request_subscribe_mqtt_topic" value="$settings['request_subscribe_mqtt_topic']"/>
-            <label>$_('Data-Publish Topic'):</label><input type="text" id="data_publish_mqtt_topic" name="data_publish_mqtt_topic" value="$settings['data_publish_mqtt_topic']"/>
-        </fieldset>
+        <details>
+            <summary>MQTT, XMPP, Email, Messages</summary>
+            <form id="pluginFormSettings" class="water-tank" action="/water-tank-save-settings" method="post">
+                <h3>MQTT</h3>
+                <p class="info">$_('SIP will listen for incomming messages in the Subscribe topic. As soon as message arrives, SIP will publish all water tank data to the Publish topic. The broker ws port is required for the Paho javascript library, please note that for a broker like mosquitto this is a different listener port than the standard 1883.')</p>
+                <fieldset class="two-col">
+                    <label>$_('Broker WS Port'):</label><input type="text" id="mqtt_broker_ws_port" name="mqtt_broker_ws_port" value="$settings['mqtt_broker_ws_port']"/>
+                    <label>$_('Data-Request Subscribe Topic'):</label><input type="text" id="request_subscribe_mqtt_topic" name="request_subscribe_mqtt_topic" value="$settings['request_subscribe_mqtt_topic']"/>
+                    <label>$_('Data-Publish Topic'):</label><input type="text" id="data_publish_mqtt_topic" name="data_publish_mqtt_topic" value="$settings['data_publish_mqtt_topic']"/>
+                </fieldset>
+                <hr>
+                <h3>XMPP</h3>
+                <p class="info">$_('SIP will send XMPP messages when it receives incomming MQTT messages from water-tank sensors. Recipients can be either a single xmpp account or a comma separated list of accounts.')</p>
+                <fieldset class="two-col">
+                    <label>$_('Username'):</label><input type="text" id="xmpp_username" name="xmpp_username" value="$settings['xmpp_username']"/>
+                    <label>$_('Password'):</label><input type="text" id="xmpp_password" name="xmpp_password" value="$settings['xmpp_password']"/>
+                    <label>$_('Server'):</label><input type="text" id="xmpp_server" name="xmpp_server" value="$settings['xmpp_server']"/>
+                    <label>$_('Subject'):</label><input type="text" id="xmpp_subject" name="xmpp_subject" value="$settings['xmpp_subject']"/>
+                    <label>$_('Recipients'):</label><input type="text" id="xmpp_recipients" name="xmpp_recipients" value="$settings['xmpp_recipients']"/>
+                </fieldset>
+                <hr>
+                <h3>Email</h3>
+                <p class="info">$_('SIP will send emails when it receives incomming MQTT messages from water-tank sensors. Recipients can be either a single email address or a comma separated list of email addresses.')</p>
+                <fieldset class="two-col">
+                    <label>$_('Username'):</label><input type="text" id="xmpp_username" name="xmpp_username" value="$settings['xmpp_username']"/>
+                    <label>$_('Password'):</label><input type="text" id="xmpp_password" name="xmpp_password" value="$settings['xmpp_password']"/>
+                    <label>$_('Server'):</label><input type="text" id="xmpp_server" name="xmpp_server" value="$settings['xmpp_server']"/>
+                    <label>$_('Subject'):</label><input type="text" id="xmpp_subject" name="xmpp_subject" value="$settings['xmpp_subject']"/>
+                    <label>$_('Recipients'):</label><input type="text" id="xmpp_recipients" name="xmpp_recipients" value="$settings['xmpp_recipients']"/>
+                </fieldset>
+
+                <hr>
+                <h3>Messages</h3>
+                <p class="info">$_('SIP will send messages (email and/or XMPP) for unassociated senson messages, invalid-sensor-measurement, overflow, warning, critical, and water-loss events. For overflow, warning, and critical events messages will be resent only after the water level has crossed back over the event level. The list of allowed keywords that will be replaced by the corresponding values is: {water_tank_id}, {water_tank_label}, {sensor_id}, {percentage}, {measurement}, {last_updated}, {mqtt_topic}, {additional_info}. Keywords must be enclosed in curly brackets. Keywords {water_tank_id},{water_tank_label},{percentage},{additional_info} are not valid for field "Unassociated-Sensor" message')</p>
+                <fieldset class="two-col">
+                    <div>
+                        <label>$_('Unassociated-Sensor message'):</label>
+                        <button type="button" class="reset" onclick='jQuery("#xmpp_unassociated_sensor_msg").val(defaults.xmpp_unassociated_sensor_msg);'>&#x21bb;</button>
+                    </div>
+                    <div>
+                        <textarea id="xmpp_unassociated_sensor_msg" name="xmpp_unassociated_sensor_msg" data-exclude-keywords="water_tank_id,water_tank_label,additional_info,percentage">$settings['xmpp_unassociated_sensor_msg']</textarea>
+                    </div>
+
+                    <div>
+                        <label>$_('Invalid Sensor Measurement message'):</label>
+                        <button type="button" class="reset" onclick="jQuery('#xmpp_invalid_sensor_measurement_msg').val(defaults.xmpp_invalid_sensor_measurement_msg);">&#x21bb;</button>
+                    </div>
+                    <div>
+                        <textarea id="xmpp_invalid_sensor_measurement_msg" name="xmpp_invalid_sensor_measurement_msg">$settings['xmpp_invalid_sensor_measurement_msg']</textarea>
+                    </div>
+                    
+                    <div>
+                        <label>$_('Overflow message'):</label>
+                        <button type="button" class="reset" onclick="jQuery('#xmpp_overflow_msg').val(defaults.xmpp_overflow_msg);">&#x21bb;</button>
+                    </div>
+                    <div>
+                        <textarea id="xmpp_overflow_msg" name="xmpp_overflow_msg">$settings['xmpp_overflow_msg']</textarea>
+                    </div>
+                        
+                    <div>
+                        <label>$_('Warning message'):</label>
+                        <button type="button" class="reset" onclick="jQuery('#xmpp_warning_msg').val(defaults.xmpp_warning_msg);">&#x21bb;</button>
+                    </div>
+                    <div>
+                        <textarea id="xmpp_warning_msg" name="xmpp_warning_msg">$settings['xmpp_warning_msg']</textarea>
+                    </div>
+                        
+                    <div>
+                        <label>$_('Critical message'):</label>
+                        <button type="button" class="reset" onclick="jQuery('#xmpp_critical_msg').val(defaults.xmpp_critical_msg);">&#x21bb;</button>
+                    </div>
+                    <div>
+                        <textarea id="xmpp_critical_msg" name="xmpp_critical_msg">$settings['xmpp_critical_msg']</textarea>
+                    </div>
+                        
+                    <div>
+                        <label>$_('Water Loss message'):</label>
+                        <button type="button" class="reset" onclick="jQuery('#water_loss_msg').val(defaults.water_loss_msg);">&#x21bb;</button>
+                    </div>
+                    <div>
+                        <textarea id="water_loss_msg" name="water_loss_msg">$settings['water_loss_msg']</textarea>
+                    </div>
+                        
+                </fieldset>
+
+                <div class="controls">
+                    <button id="cUpdateSettings" class="submit"><b>$_('Update')</b></span>
+                    <button id="cCancel" class="cancel danger">$_('Cancel')</button>
+                </div>
+                
+            </form>
+        </details>
+        
         <hr>
-        <h3>XMPP</h3>
-        <p class="info">$_('SIP will send XMPP messages for invalid-sensor-measurement, overflow, warning, critical, and water-loss events. For overflow, warning, and critical events messages will be resent only after the water level has crossed back above the event level.')</p>
-        <fieldset class="two-col">
-            <label>$_('Username'):</label><input type="text" id="xmpp_username" name="xmpp_username" value="$settings['xmpp_username']"/>
-            <label>$_('Password'):</label><input type="text" id="xmpp_password" name="xmpp_password" value="$settings['xmpp_password']"/>
-            <label>$_('Server'):</label><input type="text" id="xmpp_server" name="xmpp_server" value="$settings['xmpp_server']"/>
-            <label>$_('Subject'):</label><input type="text" id="xmpp_subject" name="xmpp_subject" value="$settings['xmpp_subject']"/>
-            <label>$_('Recipients'):</label><input type="text" id="xmpp_recipients" name="xmpp_recipients" value="$settings['xmpp_recipients']"/>
-            <div>
-                <label>$_('Unassociated-Sensor message'):</label>
-                <button type="button" class="reset" onclick='jQuery("#xmpp_unassociated_sensor_msg").val(defaults.xmpp_unassociated_sensor_msg);'>&#x21bb;</button>
-            </div>
-            <textarea id="xmpp_unassociated_sensor_msg" name="xmpp_unassociated_sensor_msg">$settings['xmpp_unassociated_sensor_msg']</textarea>
-                
-            <div>
-                <label>$_('Invalid Sensor Measurement message'):</label>
-                <button type="button" class="reset" onclick="jQuery('#xmpp_invalid_sensor_measurement_msg').val(defaults.xmpp_invalid_sensor_measurement_msg);">&#x21bb;</button>
-            </div>
-            <textarea id="xmpp_invalid_sensor_measurement_msg" name="xmpp_invalid_sensor_measurement_msg">$settings['xmpp_invalid_sensor_measurement_msg']</textarea>
-            
-            <div>
-                <label>$_('Overflow message'):</label>
-                <button type="button" class="reset" onclick="jQuery('#xmpp_overflow_msg').val(defaults.xmpp_overflow_msg);">&#x21bb;</button>
-            </div>
-            <textarea id="xmpp_overflow_msg" name="xmpp_overflow_msg">$settings['xmpp_overflow_msg']</textarea>
-                
-            <div>
-                <label>$_('Warning message'):</label>
-                <button type="button" class="reset" onclick="jQuery('#xmpp_warning_msg').val(defaults.xmpp_warning_msg);">&#x21bb;</button>
-            </div>
-            <textarea id="xmpp_warning_msg" name="xmpp_warning_msg">$settings['xmpp_warning_msg']</textarea>
-                
-            <div>
-                <label>$_('Critical message'):</label>
-                <button type="button" class="reset" onclick="jQuery('#xmpp_critical_msg').val(defaults.xmpp_critical_msg);">&#x21bb;</button>
-            </div>
-            <textarea id="xmpp_critical_msg" name="xmpp_critical_msg">$settings['xmpp_critical_msg']</textarea>
-                
-            <div>
-                <label>$_('Water Loss message'):</label>
-                <button type="button" class="reset" onclick="jQuery('#water_loss_msg').val(defaults.water_loss_msg);">&#x21bb;</button>
-            </div>
-            <textarea id="water_loss_msg" name="water_loss_msg">$settings['water_loss_msg']</textarea>
-                
-        </fieldset>
-        <hr>
+    <form id="pluginFormWaterTanks" class="water-tank" action="/water-tank-save-water-tanks" method="post">
         <h3>$_('Water Tanks')</h3>
         <p class="info">Add, Edit, and Delete water tank records</p>
         <table>
@@ -433,12 +521,13 @@ return txt.documentElement.textContent;
             
         </fieldset>  
         </br>
+        <div class="controls">
+            <button id="cAddNew" class="submit"><b>$_('Add New')</b></button>
+            <button id="cUpdate" class="submit" disabled="true"><b>$_('Update')</b></button>
+            <button id="cDelete" class="submit danger" disabled="true"><b>$_('Delete')</b></button>
+            <button id="cCancel" class="cancel danger">$_('Cancel')</button>
+        </div>
+        
     </form>
 
-<div class="controls">
-    <button id="cAddNew" class="submit"><b>$_('Add New')</b></button>
-    <button id="cUpdate" class="submit"><b>$_('Update')</b></button>
-    <button id="cDelete" class="submit danger" disabled="true"><b>$_('Delete')</b></button>
-    <button id="cCancel" class="cancel danger">$_('Cancel')</button>
-</div>
 </div>

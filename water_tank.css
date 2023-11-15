@@ -193,6 +193,10 @@ form.water-tank input{
     border: none;
 }
 
+.water-tank summary {
+    font-size: medium;
+}
+
 #water_tank_table .water-tank-label {
     font-weight: bold;
     color: #333;
