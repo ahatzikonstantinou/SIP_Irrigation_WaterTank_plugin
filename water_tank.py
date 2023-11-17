@@ -69,6 +69,47 @@ class WaterTank(ABC):
         self.invalid_sensor_measurement = False
         self.percentage = None
 
+    def InitFromDict(self, d):
+        overflow_programs = {}
+        warning_suspend_programs = {}
+        warning_activate_programs = {}
+        critical_suspend_programs = {}
+        critical_activate_programs = {}
+        for pn in gv.pnames:
+            overflow_programs[pn] = True if ('overflow_program_' + pn) in d else False
+            warning_suspend_programs[pn] = True if ('warning_suspend_program_' + pn) in d else False
+            warning_activate_programs[pn] = True if ('warning_activate_program_' + pn) in d else False
+            critical_suspend_programs[pn] = True if ('critical_suspend_program_' + pn) in d else False
+            critical_activate_programs[pn] = True if ('critical_activate_program_' + pn) in d else False
+
+        self.id = d["id"]
+        self.label = d["label"]
+        self.sensor_mqtt_topic = d["sensor_mqtt_topic"]
+        self.invalid_sensor_measurement_email = (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"]))
+        self.invalid_sensor_measurement_xmpp = (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"]))
+        self.sensor_id = d["sensor_id"]
+        self.sensor_offset_from_top = float(d["sensor_offset_from_top"])
+        self.min_valid_sensor_measurement = None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"])
+        self.max_valid_sensor_measurement = None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"])
+        self.enabled = ("enabled" in d and str(d["enabled"]) in ["on", "true", "True"])
+        self.overflow_level = None if not d["overflow_level"] else float(d["overflow_level"])
+        self.overflow_email = ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"]))
+        self.overflow_xmpp = ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"]))
+        self.overflow_safe_level = None if not d["overflow_safe_level"] else float(d["overflow_safe_level"])
+        self.overflow_programs = overflow_programs
+        self.warning_level = None if not d["warning_level"] else float(d["warning_level"])
+        self.warning_email = ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"]))
+        self.warning_xmpp = ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"]))
+        self.warning_suspend_programs = warning_suspend_programs
+        self.warning_activate_programs = warning_activate_programs
+        self.critical_level = None if not d["critical_level"] else float( d["critical_level"])
+        self.critical_email = ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"]))
+        self.critical_xmpp = ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"]))
+        self.critical_suspend_programs = critical_suspend_programs
+        self.critical_activate_programs = critical_activate_programs
+        self.loss_email = ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"]))
+        self.loss_xmpp = ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
+
     def UpdateSensorMeasurement(self, sensor_id, measurement):
         self.last_updated = datetime.now().replace(microsecond=0)
         self.sensor_measurement = measurement
@@ -97,12 +138,21 @@ class WaterTank(ABC):
         
 
 class WaterTankRectangular(WaterTank):
-    def __init__(self, id, label, width, length, height, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement,max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_email, warning_xmpp, warning_suspend_programs, warning_activate_programs, critical_level, critical_email, critical_xmpp, critical_suspend_programs,critical_activate_programs,loss_email, loss_xmpp):
+    def __init__(self, id = None, label = None, width = None, length = None, height = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_email = None, warning_xmpp = None, warning_suspend_programs = None, warning_activate_programs = None, critical_level = None, critical_email = None, critical_xmpp = None, critical_suspend_programs = None,critical_activate_programs = None,loss_email = None, loss_xmpp = None):
         super().__init__(id, label, WaterTankType.RECTANGULAR.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement,max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_email, warning_xmpp, warning_suspend_programs, warning_activate_programs, critical_level, critical_email, critical_xmpp, critical_suspend_programs,critical_activate_programs,loss_email, loss_xmpp)
         self.width = width
         self.length = length
         self.height = height
     
+    def FromDict(d):
+        wt = WaterTankRectangular()
+        wt.InitFromDict(d)
+        wt.width = None if not d["width"] else float(d["width"])
+        wt.length = None if not d["length"] else float(d["length"])
+        wt.height = None if not d["height"] else float(d["height"])
+        return wt
+                
+
     def UpdateSensorMeasurement(self, sensor_id, measurement):
         if not super().UpdateSensorMeasurement(sensor_id, measurement):
             return False
@@ -122,10 +172,17 @@ class WaterTankRectangular(WaterTank):
 
 
 class WaterTankCylindricalHorizontal(WaterTank):
-    def __init__(self, id, label, length, diameter, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement,max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_email, warning_xmpp, warning_suspend_programs, warning_activate_programs, critical_level, critical_email, critical_xmpp, critical_suspend_programs,critical_activate_programs,loss_email, loss_xmpp):
+    def __init__(self, id = None, label = None, length = None, diameter = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_email = None, warning_xmpp = None, warning_suspend_programs = None, warning_activate_programs = None, critical_level = None, critical_email = None, critical_xmpp = None, critical_suspend_programs = None,critical_activate_programs = None,loss_email = None, loss_xmpp = None):
         super().__init__(id, label, WaterTankType.CYLINDRICAL_HORIZONTAL.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement,max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_email, warning_xmpp, warning_suspend_programs, warning_activate_programs, critical_level, critical_email, critical_xmpp, critical_suspend_programs,critical_activate_programs,loss_email, loss_xmpp)
         self.length = length
         self.diameter = diameter
+
+    def FromDict(d):
+        wt = WaterTankCylindricalHorizontal()
+        wt.InitFromDict(d)
+        wt.length = None if not d["length"] else float(d["length"])
+        wt.diameter = None if not d["diameter"] else float(d["diameter"])
+        return wt
 
     def UpdateSensorMeasurement(self, sensor_id, measurement):
         if not super().UpdateSensorMeasurement(sensor_id, measurement):
@@ -151,10 +208,17 @@ class WaterTankCylindricalHorizontal(WaterTank):
 
 
 class WaterTankCylindricalVertical(WaterTank):
-    def __init__(self, id, label, diameter, height, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement,max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_email, warning_xmpp, warning_suspend_programs, warning_activate_programs, critical_level, critical_email, critical_xmpp, critical_suspend_programs,critical_activate_programs,loss_email, loss_xmpp):
+    def __init__(self, id = None, label = None, diameter = None, height = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_email = None, warning_xmpp = None, warning_suspend_programs = None, warning_activate_programs = None, critical_level = None, critical_email = None, critical_xmpp = None, critical_suspend_programs = None,critical_activate_programs = None,loss_email = None, loss_xmpp = None):
         super().__init__(id, label, WaterTankType.CYLINDRICAL_VERTICAL.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement,max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_email, warning_xmpp, warning_suspend_programs, warning_activate_programs, critical_level, critical_email, critical_xmpp, critical_suspend_programs,critical_activate_programs,loss_email, loss_xmpp)
         self.height = height
         self.diameter = diameter
+
+    def FromDict(d):
+        wt = WaterTankCylindricalVertical()
+        wt.InitFromDict(d)
+        wt.height = None if not d["height"] else float(d["height"])
+        wt.diameter = None if not d["diameter"] else float(d["diameter"])
+        return wt
 
     def UpdateSensorMeasurement(self, sensor_id, measurement):
         if not super().UpdateSensorMeasurement(sensor_id, measurement):
@@ -175,11 +239,19 @@ class WaterTankCylindricalVertical(WaterTank):
 
 
 class WaterTankElliptical(WaterTank):
-    def __init__(self, id, label, length, horizontal_axis, vertical_axis, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement,max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_email, warning_xmpp, warning_suspend_programs, warning_activate_programs, critical_level, critical_email, critical_xmpp, critical_suspend_programs,critical_activate_programs,loss_email, loss_xmpp):
+    def __init__(self, id = None, label = None, length = None, horizontal_axis = None, vertical_axis = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_email = None, warning_xmpp = None, warning_suspend_programs = None, warning_activate_programs = None, critical_level = None, critical_email = None, critical_xmpp = None, critical_suspend_programs = None,critical_activate_programs = None,loss_email = None, loss_xmpp = None):
         super().__init__(id, label, WaterTankType.ELLIPTICAL.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement,max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_email, warning_xmpp, warning_suspend_programs, warning_activate_programs, critical_level, critical_email, critical_xmpp, critical_suspend_programs,critical_activate_programs,loss_email, loss_xmpp)
         self.length = length
         self.horizontal_axis = horizontal_axis
         self.vertical_axis = vertical_axis
+
+    def FromDict(d):
+        wt = WaterTankElliptical()
+        wt.InitFromDict(d)
+        wt.length = None if not d["length"] else float(d["length"])
+        wt.horizontal_axis = None if not d["horizontal_axis"] else float(d["horizontal_axis"])
+        wt.vertical_axis = None if not d["vertical_axis"] else float(d["vertical_axis"])
+        return wt
 
     def UpdateSensorMeasurement(self, sensor_id, measurement):
         if not super().UpdateSensorMeasurement(sensor_id, measurement):
@@ -211,154 +283,166 @@ class WaterTankElliptical(WaterTank):
 
 class WaterTankFactory():
     def FromDict(d, addSettingsProperties = True):
+        # wt = None
+        # type = int(d["type"])
+
+        # overflow_programs = {}
+        # warning_suspend_programs = {}
+        # warning_activate_programs = {}
+        # critical_suspend_programs = {}
+        # critical_activate_programs = {}
+        # for pn in gv.pnames:
+        #     overflow_programs[pn] = True if ('overflow_program_' + pn) in d else False
+        #     warning_suspend_programs[pn] = True if ('warning_suspend_program_' + pn) in d else False
+        #     warning_activate_programs[pn] = True if ('warning_activate_program_' + pn) in d else False
+        #     critical_suspend_programs[pn] = True if ('critical_suspend_program_' + pn) in d else False
+        #     critical_activate_programs[pn] = True if ('critical_activate_program_' + pn) in d else False
+
+        # print("d['enabled']:{} to python:{}".format(
+        #     (d["enabled"] if 'enabled' in d else 'Not in d'),
+        #     ('enabled' in d and (str(d["enabled"]) in ["on", "true", "True"]))))
+
+        # if type == WaterTankType.RECTANGULAR.value:
+        #     wt = WaterTankRectangular(
+        #         d["id"],
+        #         d["label"],
+        #         None if not d["width"] else float(d["width"]),
+        #         None if not d["length"] else float(d["length"]),
+        #         None if not d["height"] else float(d["height"]),
+        #         d["sensor_mqtt_topic"],
+        #         (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
+        #         (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
+        #         d["sensor_id"], 
+        #         float(d["sensor_offset_from_top"]),
+        #         None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
+        #         None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
+        #         ("enabled" in d and d["enabled"] in ["on", "true", "True"]),
+        #         None if not d["overflow_level"] else float(d["overflow_level"]),
+        #         ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
+        #         ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
+        #         None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
+        #         overflow_programs,
+        #         None if not d["warning_level"] else float(d["warning_level"]),
+        #         ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
+        #         ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
+        #         warning_suspend_programs,
+        #         warning_activate_programs,
+        #         None if not d["critical_level"] else float( d["critical_level"]),
+        #         ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
+        #         ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
+        #         critical_suspend_programs,
+        #         critical_activate_programs,
+        #         ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
+        #         ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
+        #     )
+        # elif type == WaterTankType.CYLINDRICAL_HORIZONTAL.value:
+        #     wt = WaterTankCylindricalHorizontal(
+        #         d["id"],
+        #         d["label"],
+        #         None if not d["length"] else float(d["length"]),
+        #         None if not d["diameter"] else float(d["diameter"]),
+        #         d["sensor_mqtt_topic"],
+        #         (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
+        #         (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
+        #         d["sensor_id"], 
+        #         float(d["sensor_offset_from_top"]),
+        #         None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
+        #         None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
+        #         ("enabled" in d and d["enabled"] in ["on", "true", "True"]),
+        #         None if not d["overflow_level"] else float(d["overflow_level"]),
+        #         ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
+        #         ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
+        #         None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
+        #         overflow_programs,
+        #         None if not d["warning_level"] else float(d["warning_level"]),
+        #         ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
+        #         ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
+        #         warning_suspend_programs,
+        #         warning_activate_programs,
+        #         None if not d["critical_level"] else float( d["critical_level"]),
+        #         ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
+        #         ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
+        #         critical_suspend_programs,
+        #         critical_activate_programs,
+        #         ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
+        #         ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
+        #     )
+        # elif type == WaterTankType.CYLINDRICAL_VERTICAL.value:
+        #     wt = WaterTankCylindricalVertical(
+        #         d["id"],
+        #         d["label"],
+        #         None if not d["diameter"] else float(d["diameter"]),
+        #         None if not d["height"] else float(d["height"]),
+        #         d["sensor_mqtt_topic"],
+        #         (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
+        #         (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
+        #         d["sensor_id"], 
+        #         float(d["sensor_offset_from_top"]),
+        #         None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
+        #         None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
+        #         ("enabled" in d and d["enabled"] in ["on", "true", "True"]),
+        #         None if not d["overflow_level"] else float(d["overflow_level"]),
+        #         ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
+        #         ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
+        #         None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
+        #         overflow_programs,
+        #         None if not d["warning_level"] else float(d["warning_level"]),
+        #         ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
+        #         ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
+        #         warning_suspend_programs,
+        #         warning_activate_programs,
+        #         None if not d["critical_level"] else float( d["critical_level"]),
+        #         ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
+        #         ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
+        #         critical_suspend_programs,
+        #         critical_activate_programs,
+        #         ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
+        #         ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
+        #     )
+        # elif type == WaterTankType.ELLIPTICAL.value:
+        #     wt = WaterTankElliptical(
+        #         d["id"],
+        #         d["label"],
+        #         None if not d["length"] else float(d["length"]),
+        #         None if not d["horizontal_axis"] else float(d["horizontal_axis"]),
+        #         None if not d["vertical_axis"] else float(d["vertical_axis"]),
+        #         d["sensor_mqtt_topic"],
+        #         (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
+        #         (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
+        #         d["sensor_id"], 
+        #         float(d["sensor_offset_from_top"]),
+        #         None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
+        #         None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
+        #         ("enabled" in d and d["enabled"] in ["on", "true", "True"]),
+        #         None if not d["overflow_level"] else float(d["overflow_level"]),
+        #         ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
+        #         ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
+        #         None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
+        #         overflow_programs,
+        #         None if not d["warning_level"] else float(d["warning_level"]),
+        #         ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
+        #         ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
+        #         warning_suspend_programs,
+        #         warning_activate_programs,
+        #         None if not d["critical_level"] else float( d["critical_level"]),
+        #         ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
+        #         ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
+        #         critical_suspend_programs,
+        #         critical_activate_programs,
+        #         ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
+        #         ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
+        #     )
+        
         wt = None
         type = int(d["type"])
-
-        overflow_programs = {}
-        warning_suspend_programs = {}
-        warning_activate_programs = {}
-        critical_suspend_programs = {}
-        critical_activate_programs = {}
-        for pn in gv.pnames:
-            overflow_programs[pn] = True if ('overflow_program_' + pn) in d else False
-            warning_suspend_programs[pn] = True if ('warning_suspend_program_' + pn) in d else False
-            warning_activate_programs[pn] = True if ('warning_activate_program_' + pn) in d else False
-            critical_suspend_programs[pn] = True if ('critical_suspend_program_' + pn) in d else False
-            critical_activate_programs[pn] = True if ('critical_activate_program_' + pn) in d else False
-
-        # print("d['overflow_email']:{} to python:{}".format(
-        #     (d["overflow_email"] if 'overflow_email' in d else 'Not in d'),
-        #     ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"]))))
         if type == WaterTankType.RECTANGULAR.value:
-            wt = WaterTankRectangular(
-                d["id"],
-                d["label"],
-                None if not d["width"] else float(d["width"]),
-                None if not d["length"] else float(d["length"]),
-                None if not d["height"] else float(d["height"]),
-                d["sensor_mqtt_topic"],
-                (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
-                (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
-                d["sensor_id"], 
-                float(d["sensor_offset_from_top"]),
-                None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
-                None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
-                ("enabled" in d and d["enabled"] in ["on", "true"]),
-                None if not d["overflow_level"] else float(d["overflow_level"]),
-                ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
-                ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
-                None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
-                overflow_programs,
-                None if not d["warning_level"] else float(d["warning_level"]),
-                ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
-                ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
-                warning_suspend_programs,
-                warning_activate_programs,
-                None if not d["critical_level"] else float( d["critical_level"]),
-                ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
-                ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
-                critical_suspend_programs,
-                critical_activate_programs,
-                ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
-                ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
-            )
+            wt = WaterTankRectangular.FromDict(d)
         elif type == WaterTankType.CYLINDRICAL_HORIZONTAL.value:
-            wt = WaterTankCylindricalHorizontal(
-                d["id"],
-                d["label"],
-                None if not d["length"] else float(d["length"]),
-                None if not d["diameter"] else float(d["diameter"]),
-                d["sensor_mqtt_topic"],
-                (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
-                (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
-                d["sensor_id"], 
-                float(d["sensor_offset_from_top"]),
-                None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
-                None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
-                ("enabled" in d and d["enabled"] in ["on", "true"]),
-                None if not d["overflow_level"] else float(d["overflow_level"]),
-                ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
-                ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
-                None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
-                overflow_programs,
-                None if not d["warning_level"] else float(d["warning_level"]),
-                ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
-                ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
-                warning_suspend_programs,
-                warning_activate_programs,
-                None if not d["critical_level"] else float( d["critical_level"]),
-                ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
-                ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
-                critical_suspend_programs,
-                critical_activate_programs,
-                ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
-                ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
-            )
+            wt = WaterTankCylindricalHorizontal.FromDict(d)
         elif type == WaterTankType.CYLINDRICAL_VERTICAL.value:
-            wt = WaterTankCylindricalVertical(
-                d["id"],
-                d["label"],
-                None if not d["diameter"] else float(d["diameter"]),
-                None if not d["height"] else float(d["height"]),
-                d["sensor_mqtt_topic"],
-                (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
-                (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
-                d["sensor_id"], 
-                float(d["sensor_offset_from_top"]),
-                None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
-                None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
-                ("enabled" in d and d["enabled"] in ["on", "true"]),
-                None if not d["overflow_level"] else float(d["overflow_level"]),
-                ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
-                ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
-                None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
-                overflow_programs,
-                None if not d["warning_level"] else float(d["warning_level"]),
-                ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
-                ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
-                warning_suspend_programs,
-                warning_activate_programs,
-                None if not d["critical_level"] else float( d["critical_level"]),
-                ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
-                ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
-                critical_suspend_programs,
-                critical_activate_programs,
-                ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
-                ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
-            )
+            wt = WaterTankCylindricalVertical.FromDict(d)
         elif type == WaterTankType.ELLIPTICAL.value:
-            wt = WaterTankElliptical(
-                d["id"],
-                d["label"],
-                None if not d["length"] else float(d["length"]),
-                None if not d["horizontal_axis"] else float(d["horizontal_axis"]),
-                None if not d["vertical_axis"] else float(d["vertical_axis"]),
-                d["sensor_mqtt_topic"],
-                (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
-                (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
-                d["sensor_id"], 
-                float(d["sensor_offset_from_top"]),
-                None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
-                None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
-                ("enabled" in d and d["enabled"] in ["on", "true"]),
-                None if not d["overflow_level"] else float(d["overflow_level"]),
-                ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
-                ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
-                None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
-                overflow_programs,
-                None if not d["warning_level"] else float(d["warning_level"]),
-                ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
-                ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
-                warning_suspend_programs,
-                warning_activate_programs,
-                None if not d["critical_level"] else float( d["critical_level"]),
-                ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
-                ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
-                critical_suspend_programs,
-                critical_activate_programs,
-                ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
-                ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
-            )
+            wt = WaterTankElliptical.FromDict(d)
         
         if(addSettingsProperties):
             settings = get_settings()
@@ -1040,9 +1124,11 @@ def updateSensorMeasurementFromCmd(cmd, water_tanks, msg):
     for awt in associated_wts:
         wt = WaterTankFactory.FromDict(awt)
         # print("Wt from {}".format(json.dumps(awt, default=serialize_datetime, indent=4)))
+        print("Before UpdateSensorMeasurement. awt['enabled']:{}, wt.enabled:{}".format(awt['enabled'], wt.enabled))
         percentageBefore = wt.percentage
         if wt.UpdateSensorMeasurement(cmd[u"sensor_id"], cmd[u"measurement"]):
             water_tanks[wt.id] = wt.__dict__
+            print("After UpdateSensorMeasurement. water_tanks[wt.id]['enabled']:{}, wt.enabled:{}".format(water_tanks[wt.id]['enabled'], wt.enabled))        
             check_events_and_send_msg(cmd, percentageBefore, wt, msg)
             water_tank_updated = True
             # print("Update water tank '{}' with measurment: {}".format(wt.id, wt.sensor_measurement))
@@ -1089,7 +1175,7 @@ def on_sensor_mqtt_message(client, msg):
         
         settings[u"water_tanks"] = water_tanks
         with open(DATA_FILE, u"w") as f:
-                json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file
+                json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file                
 
         client = mqtt.get_client()
         if client:

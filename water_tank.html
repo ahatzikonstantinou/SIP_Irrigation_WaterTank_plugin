@@ -108,20 +108,20 @@ return txt.documentElement.textContent;
 
             // called when a message arrives
             function onMessageArrived(message) {
-                console.log("onMessageArrived:"+message.payloadString);
+                //console.log("onMessageArrived:"+message.payloadString);
                 try
                 {
                     const water_tanks = JSON.parse(message.payloadString);
-                    console.log('Received MQTT message:', water_tanks);  
+                    //console.log('Received MQTT message:', water_tanks);  
                     Object.keys(water_tanks).forEach(e => {
-                        console.log(`key= $${e} value=$${water_tanks[e]}`);
+                        //console.log(`key= $${e} value=$${water_tanks[e]}`);
                         const id = e;
                         const water_tank = water_tanks[e];
-                        console.log('id: ' + id + ", water_tank: ", water_tank);
+                        //console.log('id: ' + id + ", water_tank: ", water_tank);
                         let td = jQuery("td").filter(function() {
                             return $$(this).text() === id;
                         });
-                        console.log('td: ', td.text());
+                        //console.log('td: ', td.text());
                         td.removeClass();
                         td.addClass(DetermineWaterTankState(water_tank));
                         if(water_tank.percentage != null)
