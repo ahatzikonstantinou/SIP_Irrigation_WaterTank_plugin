@@ -146,13 +146,19 @@ return txt.documentElement.textContent;
                
         jQuery.validator.addMethod("messageRule", function(value, element) {
             let keywords = value.match(/{(.*?)}/g);    // capture all words between curly brackets, will include the curly brackets
-            const allowedKeywords = ["water_tank_id", "water_tank_label", "sensor_id", "percentage", "measurement", "last_updated", "mqtt_topic", "additional_info"];
+            let allowedKeywords = ["water_tank_id", "water_tank_label", "sensor_id", "percentage", "measurement", "last_updated", "mqtt_topic", "additional_info"];
             
             let excludeKeywordsStr = jQuery("#"+element.id).data("exclude-keywords");            
             let excludeKeywords = [];
             if( excludeKeywordsStr != null && excludeKeywordsStr.length > 0 )
             {
                 excludeKeywords = excludeKeywordsStr.split(',');
+            }
+            
+            let extraKeywordsStr = jQuery("#"+element.id).data("extra-keywords");
+            if( extraKeywordsStr != null && extraKeywordsStr.length > 0 )
+            {
+                allowedKeywords = allowedKeywords.concat(extraKeywordsStr.split(','));
             }
             
             let invalidKeywords = [];
@@ -172,15 +178,24 @@ return txt.documentElement.textContent;
             jQuery.validator.messages.messageRule = "Invalid keywords: " + invalidKeywords.join();
             return this.optional(element) || (invalidKeywords.length == 0);
         });
-
+        
         jQuery("#pluginFormSettings").validate({
             rules: {
+                unrecognised_msg: { messageRule: true },
                 xmpp_unassociated_sensor_msg: { messageRule: true },
                 xmpp_invalid_sensor_measurement_msg: { messageRule: true },
                 xmpp_overflow_msg: { messageRule: true },
                 xmpp_warning_msg: { messageRule: true },
                 xmpp_critical_msg: { messageRule: true },
-                water_loss_msg: { messageRule: true }
+                water_loss_msg: { messageRule: true },
+                email_recipients: {
+                    pattern: /^[\W]*([\w+\-.%]+@[\w\-.]+\.[A-Za-z]{2,4}[\W]*,{1}[\W]*)*([\w+\-.%]+@[\w\-.]+\.[A-Za-z]{2,4})[\W]*$$/
+                }
+            },
+            messages: {
+                email_recipients: {
+                    pattern: "Comma separated list of email addresses"
+                }
             }
         });
         
@@ -188,12 +203,12 @@ return txt.documentElement.textContent;
             rules: {
                 id: {
                     pattern: /^[a-zA-Z0-9_]+$$/
-                    },
+                }
             },
             messages: {
                 id: {
                     pattern: 'Only letters, numbers, and underscores are allowed'
-                    }
+                }
             }
         });
         
@@ -223,6 +238,8 @@ return txt.documentElement.textContent;
         jQuery("#vertical_axis").val(water_tank.vertical_axis);
         
         jQuery("#sensor_mqtt_topic").val(water_tank.sensor_mqtt_topic);
+        jQuery("#invalid_sensor_measurement_email").prop('checked', water_tank.invalid_sensor_measurement_email);
+        jQuery("#invalid_sensor_measurement_xmpp").prop('checked', water_tank.invalid_sensor_measurement_xmpp);
         jQuery("#sensor_id").val(water_tank.sensor_id);
         jQuery("#sensor_offset_from_top").val(water_tank.sensor_offset_from_top);
         jQuery("#min_valid_sensor_measurement").val(water_tank.min_valid_sensor_measurement);
@@ -315,7 +332,7 @@ return txt.documentElement.textContent;
                 <h3>MQTT</h3>
                 <p class="info">$_('SIP will listen for incomming messages in the Subscribe topic. As soon as message arrives, SIP will publish all water tank data to the Publish topic. The broker ws port is required for the Paho javascript library, please note that for a broker like mosquitto this is a different listener port than the standard 1883.')</p>
                 <fieldset class="two-col">
-                    <label>$_('Broker WS Port'):</label><input type="text" id="mqtt_broker_ws_port" name="mqtt_broker_ws_port" value="$settings['mqtt_broker_ws_port']"/>
+                    <label>$_('Broker WS Port'):</label><input type="number" id="mqtt_broker_ws_port" name="mqtt_broker_ws_port" value="$settings['mqtt_broker_ws_port']"/>
                     <label>$_('Data-Request Subscribe Topic'):</label><input type="text" id="request_subscribe_mqtt_topic" name="request_subscribe_mqtt_topic" value="$settings['request_subscribe_mqtt_topic']"/>
                     <label>$_('Data-Publish Topic'):</label><input type="text" id="data_publish_mqtt_topic" name="data_publish_mqtt_topic" value="$settings['data_publish_mqtt_topic']"/>
                 </fieldset>
@@ -333,23 +350,42 @@ return txt.documentElement.textContent;
                 <h3>Email</h3>
                 <p class="info">$_('SIP will send emails when it receives incomming MQTT messages from water-tank sensors. Recipients can be either a single email address or a comma separated list of email addresses.')</p>
                 <fieldset class="two-col">
-                    <label>$_('Username'):</label><input type="text" id="xmpp_username" name="xmpp_username" value="$settings['xmpp_username']"/>
-                    <label>$_('Password'):</label><input type="text" id="xmpp_password" name="xmpp_password" value="$settings['xmpp_password']"/>
-                    <label>$_('Server'):</label><input type="text" id="xmpp_server" name="xmpp_server" value="$settings['xmpp_server']"/>
-                    <label>$_('Subject'):</label><input type="text" id="xmpp_subject" name="xmpp_subject" value="$settings['xmpp_subject']"/>
-                    <label>$_('Recipients'):</label><input type="text" id="xmpp_recipients" name="xmpp_recipients" value="$settings['xmpp_recipients']"/>
+                    <label>$_('Username'):</label><input type="text" id="email_username" name="email_username" value="$settings['email_username']"/>
+                    <label>$_('Password'):</label><input type="text" id="email_password" name="email_password" value="$settings['email_password']"/>
+                    <label>$_('Server'):</label><input type="text" id="email_server" name="email_server" value="$settings['email_server']"/>
+                    <label>$_('Server port'):</label><input type="number" id="email_server_port" name="email_server_port" value="$settings['email_server_port']"/>
+                    <label>$_('Subject'):</label><input type="text" id="email_subject" name="email_subject" value="$settings['email_subject']"/>
+                    <label>$_('Recipients'):</label><div><input type="text" id="email_recipients" name="email_recipients" value="$settings['email_recipients']"/></div>
                 </fieldset>
 
                 <hr>
                 <h3>Messages</h3>
-                <p class="info">$_('SIP will send messages (email and/or XMPP) for unassociated senson messages, invalid-sensor-measurement, overflow, warning, critical, and water-loss events. For overflow, warning, and critical events messages will be resent only after the water level has crossed back over the event level. The list of allowed keywords that will be replaced by the corresponding values is: {water_tank_id}, {water_tank_label}, {sensor_id}, {percentage}, {measurement}, {last_updated}, {mqtt_topic}, {additional_info}. Keywords must be enclosed in curly brackets. Keywords {water_tank_id},{water_tank_label},{percentage},{additional_info} are not valid for field "Unassociated-Sensor" message')</p>
+                <p class="info">$_('SIP will send messages (email and/or XMPP) for unassociated senson messages, invalid-sensor-measurement, overflow, warning, critical, and water-loss events. For overflow, warning, and critical events messages will be resent only after the water level has crossed back over the event level. The list of allowed keywords that will be replaced by the corresponding values is: {water_tank_id}, {water_tank_label}, {sensor_id}, {percentage}, {measurement}, {last_updated}, {mqtt_topic}, {additional_info}. Keywords must be enclosed in curly brackets. Keywords {water_tank_id},{water_tank_label},{percentage},{additional_info} are not valid for field "Unassociated-Sensor" message. For field Unrecognised message valid are only keywords {mqtt_topic}, {date}, and {message}')</p>
                 <fieldset class="two-col">
+                    <div>
+                        <label>$_('Unrecognised message'):</label>
+                        <button type="button" class="reset" onclick='jQuery("#unrecognised_msg").val(defaults.unrecognised_msg);'>&#x21bb;</button>
+                    </div>
+                    <div>
+                        <textarea id="unrecognised_msg" name="unrecognised_msg" data-exclude-keywords="water_tank_id,water_tank_label,sensor_id,percentage,measurement,last_updated,additional_info" data-extra-keywords="date,message">$settings['unrecognised_msg']</textarea>
+                    </div>
+
+                    <label>$_('Notify for unrecognised message')</label><div style="display:flex; flex-wrap: wrap;">
+                        <label>Email<input id="unrecognised_msg_email" name="unrecognised_msg_email" type="checkbox" ${'checked=checked' if settings['unrecognised_msg_email'] else ''}/></label>
+                        <label>Xmpp<input id="unrecognised_msg_xmpp" name="unrecognised_msg_xmpp" type="checkbox" ${'checked=checked' if settings['unrecognised_msg_xmpp'] else ''}/></label>
+                    </div>
+
                     <div>
                         <label>$_('Unassociated-Sensor message'):</label>
                         <button type="button" class="reset" onclick='jQuery("#xmpp_unassociated_sensor_msg").val(defaults.xmpp_unassociated_sensor_msg);'>&#x21bb;</button>
                     </div>
                     <div>
                         <textarea id="xmpp_unassociated_sensor_msg" name="xmpp_unassociated_sensor_msg" data-exclude-keywords="water_tank_id,water_tank_label,additional_info,percentage">$settings['xmpp_unassociated_sensor_msg']</textarea>
+                    </div>
+
+                    <label>$_('Notify for unassociated sensors')</label><div style="display:flex; flex-wrap: wrap;">
+                        <label>Email<input id="unassociated_sensor_email" name="unassociated_sensor_email" type="checkbox" ${'checked=checked' if settings['unassociated_sensor_email'] else ''}/></label>
+                        <label>Xmpp<input id="unassociated_sensor_xmpp" name="unassociated_sensor_xmpp" type="checkbox" ${'checked=checked' if settings['unassociated_sensor_xmpp'] else ''}/></label>
                     </div>
 
                     <div>
@@ -458,6 +494,10 @@ return txt.documentElement.textContent;
             <label>$_('Last updated'):</label><div><input type=text id="last_updated" name="last_updated" value="" readonly/></div>
             <label>$_('Full %'):</label><div><input type=number id="percentage" name="percentage" value="" readonly/></div>
             <label>$_('Enabled'):</label><div><input type="checkbox" id="enabled" name="enabled"/></div>
+            <label>$_('Notify for invalid measurements'):</label><div style="display:flex; flex-wrap: wrap;">
+                <label>Email<input id="invalid_sensor_measurement_email" name="invalid_sensor_measurement_email" type="checkbox"/></label>
+                <label>Xmpp<input id="invalid_sensor_measurement_xmpp" name="invalid_sensor_measurement_xmpp" type="checkbox"/></label>
+            </div>
         </fieldset>
 
         <h4>$_('Overflow')</h4>
