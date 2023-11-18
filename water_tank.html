@@ -59,7 +59,7 @@ return txt.documentElement.textContent;
 
         // console.log('Getting all water tank data');
         jQuery.getJSON('water-tank-get-all', function(data){
-            // console.log('data:', data);
+            console.log('data:', data);
             water_tank_data = data;
             console.log('water_tank_data:', water_tank_data);
 
@@ -112,7 +112,7 @@ return txt.documentElement.textContent;
                 try
                 {
                     const water_tanks = JSON.parse(message.payloadString);
-                    //console.log('Received MQTT message:', water_tanks);  
+                    console.log('Received MQTT message:', water_tanks);  
                     Object.keys(water_tanks).forEach(e => {
                         //console.log(`key= $${e} value=$${water_tanks[e]}`);
                         const id = e;
@@ -143,6 +143,33 @@ return txt.documentElement.textContent;
             }
         });
         
+        jQuery("#water-tank-up,#water-tank-down").on( "click", function(event){
+            let row = jQuery(this).parents("tr:first");
+
+            let id = jQuery(row).children().eq(0).text();
+            
+            let beforeIndex = jQuery(row).index();
+            console.log("Before row index: " + jQuery(row).index());
+
+            let move = "down";
+
+            if (jQuery(this).is("#water-tank-up")) {
+                row.insertBefore(row.prev());
+            } else {
+                row.insertAfter(row.next());
+                move = "up";
+            }
+            console.log("After row index: " + jQuery(row).index());
+            let afterIndex = jQuery(row).index();
+            if(beforeIndex != afterIndex)
+            {
+                jQuery.post('water-tank-save-order', { water_tank_id: id, move: move, order : afterIndex }, 
+                    function(returnedData){
+                        console.log(returnedData);
+                    }, 'json'
+                );
+            }
+        });
                
         jQuery.validator.addMethod("messageRule", function(value, element) {
             let keywords = value.match(/{(.*?)}/g);    // capture all words between curly brackets, will include the curly brackets
@@ -216,7 +243,7 @@ return txt.documentElement.textContent;
 
     function getWaterTankData(id)
     {
-        // console.log('Getting water tank data for id :', id);
+        console.log('Getting water tank data for id :', id);
         // console.log('water_tank_data:', water_tank_data);
         let water_tank = water_tank_data.find( w => {
             return w.id === id;
@@ -449,10 +476,11 @@ return txt.documentElement.textContent;
                     <th>$_('Label')</th>
                     <th>$_('Full')</th>
                     <th>$_('Last Update')</th>
-                    <th>$_('Enable')</th>
+                    <th>$_('Show')</th>
+                    <th>$_('Order')</th>
                 </tr>
             </thead>
-            $for tank in settings['water_tanks'].values():
+            $for tank in settings['water_tanks'] :
                 <tr onclick="getWaterTankData('$tank['id']')">
                     $ sensor_error = 'sensor_error' if tank['invalid_sensor_measurement'] else ''
                     <td class="$sensor_error">$tank['id']</td>
@@ -461,7 +489,8 @@ return txt.documentElement.textContent;
                     <td>$str_percentage</td>
                     <td>$tank['last_updated']</td>
                     $ checked = 'checked="checked"' if tank['enabled'] else ''
-                    <td><input type="checkbox" name="static" onclick="return false;" $checked/></td>                
+                    <td><input type="checkbox" name="static" onclick="return false;" $checked/></td>
+                    <td><span id="water-tank-up" style="font-size:1.5em;border: 1px solid black; border-radius:20%;">&#x25B2;</span>&nbsp;<span id="water-tank-down" style="font-size:1.5em;border: 1px solid black; border-radius:20%;">&#x25BC;</span></td>        
                 </tr>
         </table>
 

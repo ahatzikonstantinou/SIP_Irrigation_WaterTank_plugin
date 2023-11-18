@@ -68,6 +68,7 @@ class WaterTank(ABC):
         self.sensor_measurement = None
         self.invalid_sensor_measurement = False
         self.percentage = None
+        self.order = None
 
     def InitFromDict(self, d):
         overflow_programs = {}
@@ -109,6 +110,7 @@ class WaterTank(ABC):
         self.critical_activate_programs = critical_activate_programs
         self.loss_email = ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"]))
         self.loss_xmpp = ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
+        self.order = None if "order" not in d else int( d["order"])
 
     def UpdateSensorMeasurement(self, sensor_id, measurement):
         self.last_updated = datetime.now().replace(microsecond=0)
@@ -283,156 +285,6 @@ class WaterTankElliptical(WaterTank):
 
 class WaterTankFactory():
     def FromDict(d, addSettingsProperties = True):
-        # wt = None
-        # type = int(d["type"])
-
-        # overflow_programs = {}
-        # warning_suspend_programs = {}
-        # warning_activate_programs = {}
-        # critical_suspend_programs = {}
-        # critical_activate_programs = {}
-        # for pn in gv.pnames:
-        #     overflow_programs[pn] = True if ('overflow_program_' + pn) in d else False
-        #     warning_suspend_programs[pn] = True if ('warning_suspend_program_' + pn) in d else False
-        #     warning_activate_programs[pn] = True if ('warning_activate_program_' + pn) in d else False
-        #     critical_suspend_programs[pn] = True if ('critical_suspend_program_' + pn) in d else False
-        #     critical_activate_programs[pn] = True if ('critical_activate_program_' + pn) in d else False
-
-        # print("d['enabled']:{} to python:{}".format(
-        #     (d["enabled"] if 'enabled' in d else 'Not in d'),
-        #     ('enabled' in d and (str(d["enabled"]) in ["on", "true", "True"]))))
-
-        # if type == WaterTankType.RECTANGULAR.value:
-        #     wt = WaterTankRectangular(
-        #         d["id"],
-        #         d["label"],
-        #         None if not d["width"] else float(d["width"]),
-        #         None if not d["length"] else float(d["length"]),
-        #         None if not d["height"] else float(d["height"]),
-        #         d["sensor_mqtt_topic"],
-        #         (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
-        #         (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
-        #         d["sensor_id"], 
-        #         float(d["sensor_offset_from_top"]),
-        #         None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
-        #         None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
-        #         ("enabled" in d and d["enabled"] in ["on", "true", "True"]),
-        #         None if not d["overflow_level"] else float(d["overflow_level"]),
-        #         ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
-        #         ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
-        #         None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
-        #         overflow_programs,
-        #         None if not d["warning_level"] else float(d["warning_level"]),
-        #         ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
-        #         ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
-        #         warning_suspend_programs,
-        #         warning_activate_programs,
-        #         None if not d["critical_level"] else float( d["critical_level"]),
-        #         ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
-        #         ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
-        #         critical_suspend_programs,
-        #         critical_activate_programs,
-        #         ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
-        #         ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
-        #     )
-        # elif type == WaterTankType.CYLINDRICAL_HORIZONTAL.value:
-        #     wt = WaterTankCylindricalHorizontal(
-        #         d["id"],
-        #         d["label"],
-        #         None if not d["length"] else float(d["length"]),
-        #         None if not d["diameter"] else float(d["diameter"]),
-        #         d["sensor_mqtt_topic"],
-        #         (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
-        #         (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
-        #         d["sensor_id"], 
-        #         float(d["sensor_offset_from_top"]),
-        #         None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
-        #         None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
-        #         ("enabled" in d and d["enabled"] in ["on", "true", "True"]),
-        #         None if not d["overflow_level"] else float(d["overflow_level"]),
-        #         ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
-        #         ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
-        #         None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
-        #         overflow_programs,
-        #         None if not d["warning_level"] else float(d["warning_level"]),
-        #         ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
-        #         ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
-        #         warning_suspend_programs,
-        #         warning_activate_programs,
-        #         None if not d["critical_level"] else float( d["critical_level"]),
-        #         ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
-        #         ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
-        #         critical_suspend_programs,
-        #         critical_activate_programs,
-        #         ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
-        #         ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
-        #     )
-        # elif type == WaterTankType.CYLINDRICAL_VERTICAL.value:
-        #     wt = WaterTankCylindricalVertical(
-        #         d["id"],
-        #         d["label"],
-        #         None if not d["diameter"] else float(d["diameter"]),
-        #         None if not d["height"] else float(d["height"]),
-        #         d["sensor_mqtt_topic"],
-        #         (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
-        #         (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
-        #         d["sensor_id"], 
-        #         float(d["sensor_offset_from_top"]),
-        #         None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
-        #         None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
-        #         ("enabled" in d and d["enabled"] in ["on", "true", "True"]),
-        #         None if not d["overflow_level"] else float(d["overflow_level"]),
-        #         ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
-        #         ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
-        #         None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
-        #         overflow_programs,
-        #         None if not d["warning_level"] else float(d["warning_level"]),
-        #         ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
-        #         ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
-        #         warning_suspend_programs,
-        #         warning_activate_programs,
-        #         None if not d["critical_level"] else float( d["critical_level"]),
-        #         ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
-        #         ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
-        #         critical_suspend_programs,
-        #         critical_activate_programs,
-        #         ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
-        #         ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
-        #     )
-        # elif type == WaterTankType.ELLIPTICAL.value:
-        #     wt = WaterTankElliptical(
-        #         d["id"],
-        #         d["label"],
-        #         None if not d["length"] else float(d["length"]),
-        #         None if not d["horizontal_axis"] else float(d["horizontal_axis"]),
-        #         None if not d["vertical_axis"] else float(d["vertical_axis"]),
-        #         d["sensor_mqtt_topic"],
-        #         (INVALID_SENSOR_MEASUREMENT_EMAIL in d and (str(d[INVALID_SENSOR_MEASUREMENT_EMAIL]) in ["on", "true", "True"])),
-        #         (INVALID_SENSOR_MEASUREMENT_XMPP in d and (str(d[INVALID_SENSOR_MEASUREMENT_XMPP]) in ["on", "true", "True"])),
-        #         d["sensor_id"], 
-        #         float(d["sensor_offset_from_top"]),
-        #         None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"]),
-        #         None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"]),
-        #         ("enabled" in d and d["enabled"] in ["on", "true", "True"]),
-        #         None if not d["overflow_level"] else float(d["overflow_level"]),
-        #         ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"])),
-        #         ('overflow_xmpp' in d and (str(d["overflow_xmpp"]) in ["on", "true", "True"])),
-        #         None if not d["overflow_safe_level"] else float(d["overflow_safe_level"]),
-        #         overflow_programs,
-        #         None if not d["warning_level"] else float(d["warning_level"]),
-        #         ('warning_email' in d and (str(d["warning_email"]) in ["on", "true", "True"])),
-        #         ('warning_xmpp' in d and (str(d["warning_xmpp"]) in ["on", "true", "True"])),
-        #         warning_suspend_programs,
-        #         warning_activate_programs,
-        #         None if not d["critical_level"] else float( d["critical_level"]),
-        #         ('critical_email' in d and (str(d["critical_email"]) in ["on", "true", "True"])),
-        #         ('critical_xmpp' in d and (str(d["critical_xmpp"]) in ["on", "true", "True"])),
-        #         critical_suspend_programs,
-        #         critical_activate_programs,
-        #         ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"])),
-        #         ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
-        #     )
-        
         wt = None
         type = int(d["type"])
         if type == WaterTankType.RECTANGULAR.value:
@@ -510,245 +362,249 @@ _settings = {
     XMPP_WATER_LOSS_MSG: u"Water loss! water tank:'{water_tank_id}'/'{water_tank_label}', sensor_id:'{sensor_id}', percentage: {percentage}%, measurement:'{measurement}', date:'{last_updated}', mqtt topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
     
     u"water_tanks": {
-        "water_tank_1": {
-            "id": "water_tank_1",
-            "label": "\u03a4\u03c3\u03b9\u03bc\u03b5\u03bd\u03c4\u03ad\u03bd\u03b9\u03b1",
-            "type": 1,
-            "sensor_mqtt_topic": "WATER_TANK_MEASUREMENT",
-            INVALID_SENSOR_MEASUREMENT_XMPP: True,
-            INVALID_SENSOR_MEASUREMENT_EMAIL: True,
-            "sensor_offset_from_top": 0.0,
-            "enabled": True,
-            "overflow_level": 80.0,
-            "overflow_email": True,
-            "overflow_xmpp": True,
-            "overflow_safe_level": None,
-            "overflow_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "warning_level": 25.0,
-            "warning_email": True,
-            "warning_xmpp": True,
-            "warning_suspend_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "warning_activate_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "critical_level": 8.0,
-            "critical_email": True,
-            "critical_xmpp": True,
-            "critical_suspend_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "critical_activate_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "loss_email": True,
-            "loss_xmpp": True,
-            "last_updated": None,
-            "sensor_id": None, 
-            "sensor_measurement": None,
-            "invalid_sensor_measurement": False,
-            "percentage": None,
-            "width": 2.0,
-            "length": 5.0,
-            "height": 2.0
-        },
-        "water_tank_2": {
-            "id": "water_tank_2",
-            "label": "\u03a3\u03b9\u03b4\u03b5\u03c1\u03ad\u03bd\u03b9\u03b1",
-            "type": 1,
-            "sensor_mqtt_topic": "WATER_TANK_MEASUREMENT",
-            INVALID_SENSOR_MEASUREMENT_XMPP: True,
-            INVALID_SENSOR_MEASUREMENT_EMAIL: True,
-            "sensor_offset_from_top": 0.0,
-            "enabled": True,
-            "overflow_level": 85.0,
-            "overflow_email": True,
-            "overflow_xmpp": True,
-            "overflow_safe_level": None,
-            "overflow_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "warning_level": 30.0,
-            "warning_email": True,
-            "warning_xmpp": True,
-            "warning_suspend_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "warning_activate_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "critical_level": 5.0,
-            "critical_email": False,
-            "critical_xmpp": False,
-            "critical_suspend_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "critical_activate_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "loss_email": True,
-            "loss_xmpp": True,
-            "last_updated": "2023-11-12 13:47",
-            "sensor_id": "Sensor_2", 
-            "sensor_measurement": 0.9,
-            "invalid_sensor_measurement": True,
-            "percentage": 40.0,
-            "width": 2.0,
-            "length": 3.0,
-            "height": 1.5
-        },
-        "water_tank_3": {
-            "id": "water_tank_3",
-            "label": "\u039c\u03b1\u03cd\u03c1\u03b7",
-            "type": 3,
-            "sensor_mqtt_topic": "WATER_TANK_MEASUREMENT",
-            INVALID_SENSOR_MEASUREMENT_XMPP: True,
-            INVALID_SENSOR_MEASUREMENT_EMAIL: True,
-            "sensor_offset_from_top": 0.0,
-            "enabled": True,
-            "overflow_level": 85.0,
-            "overflow_email": True,
-            "overflow_xmpp": False,
-            "overflow_safe_level": None,
-            "overflow_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "warning_level": 30.0,
-            "warning_email": False,
-            "warning_xmpp": True,
-            "warning_suspend_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "warning_activate_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "critical_level": 5.0,
-            "critical_email": True,
-            "critical_xmpp": True,
-            "critical_suspend_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "critical_activate_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "loss_email": False,
-            "loss_xmpp": False,
-            "last_updated": "2023-11-12 13:47",
-            "sensor_id": "Sensor_3", 
-            "sensor_measurement": 1.5,
-            "invalid_sensor_measurement": False,
-            "percentage": 25.0,
-            "height": 2.0,
-            "diameter": 2.0
-        },
-        "water_tank_4": {
-            "id": "water_tank_4",
-            "label": "\u039d\u03b5\u03c1\u03cc \u03b4\u03b9\u03ba\u03c4\u03cd\u03bf\u03c5",
-            "type": 4,
-            "sensor_mqtt_topic": "WATER_TANK_MEASUREMENT",
-            INVALID_SENSOR_MEASUREMENT_XMPP: True,
-            INVALID_SENSOR_MEASUREMENT_EMAIL: True,
-            "sensor_offset_from_top": 0.0,
-            "enabled": True,
-            "overflow_level": 85.0,
-            "overflow_email": False,
-            "overflow_xmpp": True,
-            "overflow_safe_level": None,
-            "overflow_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "warning_level": 40.0,
-            "warning_email": True,
-            "warning_xmpp": True,
-            "warning_suspend_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "warning_activate_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "critical_level": 5.0,
-            "critical_email": True,
-            "critical_xmpp": True,
-            "critical_suspend_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "critical_activate_programs": {
-                "1": False,
-                "2": False,
-                "3": False,
-                "4": False
-            },
-            "loss_email": True,
-            "loss_xmpp": True,
-            "last_updated": "2023-11-12 13:47",
-            "sensor_id": "Sensor_4", 
-            "sensor_measurement": 0.6,
-            "invalid_sensor_measurement": False,
-            "percentage": 61.41848493043786,
-            "length": 2.0,
-            "horizontal_axis": 1.0,
-            "vertical_axis": 0.8
-        }
+        # "water_tank_1": {
+        #     "id": "water_tank_1",
+        #     "label": "\u03a4\u03c3\u03b9\u03bc\u03b5\u03bd\u03c4\u03ad\u03bd\u03b9\u03b1",
+        #     "type": 1,
+        #     "sensor_mqtt_topic": "WATER_TANK_MEASUREMENT",
+        #     INVALID_SENSOR_MEASUREMENT_XMPP: True,
+        #     INVALID_SENSOR_MEASUREMENT_EMAIL: True,
+        #     "sensor_offset_from_top": 0.0,
+        #     "enabled": True,
+        #     "overflow_level": 80.0,
+        #     "overflow_email": True,
+        #     "overflow_xmpp": True,
+        #     "overflow_safe_level": None,
+        #     "overflow_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "warning_level": 25.0,
+        #     "warning_email": True,
+        #     "warning_xmpp": True,
+        #     "warning_suspend_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "warning_activate_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "critical_level": 8.0,
+        #     "critical_email": True,
+        #     "critical_xmpp": True,
+        #     "critical_suspend_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "critical_activate_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "loss_email": True,
+        #     "loss_xmpp": True,
+        #     "last_updated": None,
+        #     "sensor_id": None, 
+        #     "sensor_measurement": None,
+        #     "invalid_sensor_measurement": False,
+        #     "percentage": None,
+        #     "width": 2.0,
+        #     "length": 5.0,
+        #     "height": 2.0,
+        #     "order": 0
+        # },
+        # "water_tank_2": {
+        #     "id": "water_tank_2",
+        #     "label": "\u03a3\u03b9\u03b4\u03b5\u03c1\u03ad\u03bd\u03b9\u03b1",
+        #     "type": 1,
+        #     "sensor_mqtt_topic": "WATER_TANK_MEASUREMENT",
+        #     INVALID_SENSOR_MEASUREMENT_XMPP: True,
+        #     INVALID_SENSOR_MEASUREMENT_EMAIL: True,
+        #     "sensor_offset_from_top": 0.0,
+        #     "enabled": True,
+        #     "overflow_level": 85.0,
+        #     "overflow_email": True,
+        #     "overflow_xmpp": True,
+        #     "overflow_safe_level": None,
+        #     "overflow_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "warning_level": 30.0,
+        #     "warning_email": True,
+        #     "warning_xmpp": True,
+        #     "warning_suspend_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "warning_activate_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "critical_level": 5.0,
+        #     "critical_email": False,
+        #     "critical_xmpp": False,
+        #     "critical_suspend_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "critical_activate_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "loss_email": True,
+        #     "loss_xmpp": True,
+        #     "last_updated": "2023-11-12 13:47",
+        #     "sensor_id": "Sensor_2", 
+        #     "sensor_measurement": 0.9,
+        #     "invalid_sensor_measurement": True,
+        #     "percentage": 40.0,
+        #     "width": 2.0,
+        #     "length": 3.0,
+        #     "height": 1.5,
+        #     "order": 1
+        # },
+        # "water_tank_3": {
+        #     "id": "water_tank_3",
+        #     "label": "\u039c\u03b1\u03cd\u03c1\u03b7",
+        #     "type": 3,
+        #     "sensor_mqtt_topic": "WATER_TANK_MEASUREMENT",
+        #     INVALID_SENSOR_MEASUREMENT_XMPP: True,
+        #     INVALID_SENSOR_MEASUREMENT_EMAIL: True,
+        #     "sensor_offset_from_top": 0.0,
+        #     "enabled": True,
+        #     "overflow_level": 85.0,
+        #     "overflow_email": True,
+        #     "overflow_xmpp": False,
+        #     "overflow_safe_level": None,
+        #     "overflow_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "warning_level": 30.0,
+        #     "warning_email": False,
+        #     "warning_xmpp": True,
+        #     "warning_suspend_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "warning_activate_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "critical_level": 5.0,
+        #     "critical_email": True,
+        #     "critical_xmpp": True,
+        #     "critical_suspend_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "critical_activate_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "loss_email": False,
+        #     "loss_xmpp": False,
+        #     "last_updated": "2023-11-12 13:47",
+        #     "sensor_id": "Sensor_3", 
+        #     "sensor_measurement": 1.5,
+        #     "invalid_sensor_measurement": False,
+        #     "percentage": 25.0,
+        #     "height": 2.0,
+        #     "diameter": 2.0,
+        #     "order": 2
+        # },
+        # "water_tank_4": {
+        #     "id": "water_tank_4",
+        #     "label": "\u039d\u03b5\u03c1\u03cc \u03b4\u03b9\u03ba\u03c4\u03cd\u03bf\u03c5",
+        #     "type": 4,
+        #     "sensor_mqtt_topic": "WATER_TANK_MEASUREMENT",
+        #     INVALID_SENSOR_MEASUREMENT_XMPP: True,
+        #     INVALID_SENSOR_MEASUREMENT_EMAIL: True,
+        #     "sensor_offset_from_top": 0.0,
+        #     "enabled": True,
+        #     "overflow_level": 85.0,
+        #     "overflow_email": False,
+        #     "overflow_xmpp": True,
+        #     "overflow_safe_level": None,
+        #     "overflow_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "warning_level": 40.0,
+        #     "warning_email": True,
+        #     "warning_xmpp": True,
+        #     "warning_suspend_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "warning_activate_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "critical_level": 5.0,
+        #     "critical_email": True,
+        #     "critical_xmpp": True,
+        #     "critical_suspend_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "critical_activate_programs": {
+        #         "1": False,
+        #         "2": False,
+        #         "3": False,
+        #         "4": False
+        #     },
+        #     "loss_email": True,
+        #     "loss_xmpp": True,
+        #     "last_updated": "2023-11-12 13:47",
+        #     "sensor_id": "Sensor_4", 
+        #     "sensor_measurement": 0.6,
+        #     "invalid_sensor_measurement": False,
+        #     "percentage": 61.41848493043786,
+        #     "length": 2.0,
+        #     "horizontal_axis": 1.0,
+        #     "vertical_axis": 0.8,
+        #     "order": 4
+        # }
     }
 }
 
@@ -776,7 +632,8 @@ urls.extend([
     u"/water-tank-save-water-tanks", u"plugins.water_tank.save_water_tanks",
     u"/water-tank-get-all", u"plugins.water_tank.get_all",
     u"/water-tank-get_mqtt_settings", u"plugins.water_tank.get_mqtt_settings",
-    u"/water-tank-delete", u"plugins.water_tank.delete"
+    u"/water-tank-delete", u"plugins.water_tank.delete",
+    u"/water-tank-save-order", u"plugins.water_tank.save_order"
     ])
 # fmt: on
 
@@ -874,19 +731,12 @@ def readWaterTankData():
         # with open(DATA_FILE, "r") as f:# Read settings from json file if it exists
         #     water_tank_data = list(json.load(f)[u"water_tanks"].values())
         settings = get_settings()
-        water_tank_data = list(settings[u"water_tanks"].values())
+        water_tank_data = sorted(list(settings[u"water_tanks"].values()), key= lambda wt : wt["order"])
+        print("readWaterTankData returns sorted list: {}".format(json.dumps(water_tank_data, default=serialize_datetime, indent=4 )))
     except IOError:  # If file does not exist return empty value
-        water_tank_data = [] #list(_settings[u"water_tanks"].values())
-        #testing/debugging
-#         water_tank_data = json.loads('''
-# [
-#     {"id": "water_tank_2", "label": "Τσιμεντένια", "percentage": 24},
-#     {"id": "water_tank_3", "label": "Σιδερένια", "percentage": 80},
-#     {"id": "water_tank_4", "label": "Μαύρη", "percentage": 90},
-#     {"id": "water_tank_5", "label": "Νερό δικτύου", "percentage": 90}
-# ]
-#                                      ''')
-    return water_tank_data  # open settings page
+        water_tank_data = []
+        
+    return water_tank_data
 
 
 def no_stations_are_on():
@@ -1177,9 +1027,7 @@ def on_sensor_mqtt_message(client, msg):
         with open(DATA_FILE, u"w") as f:
                 json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file                
 
-        client = mqtt.get_client()
-        if client:
-            client.publish(settings[WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC], json.dumps(water_tanks, default=serialize_datetime), qos=1, retain=True)
+        publish_water_tanks_mqtt()
     except Exception as e:
         print("An unexpected error occured", e)
 
@@ -1188,11 +1036,7 @@ def on_data_request_mqtt_message(client, msg):
     """
     Callback when MQTT message is received requesting water tank data
     """
-    settings = get_settings()
-    water_tanks = settings[u"water_tanks"]
-    client = mqtt.get_client()
-    if client:
-        client.publish(settings[WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC], json.dumps(water_tanks, default=serialize_datetime), qos=1, retain=True)
+    publish_water_tanks_mqtt()
 
 
 def subscribe_mqtt():
@@ -1232,6 +1076,18 @@ def refresh_mqtt_subscriptions():
     subscribe_mqtt()    
 
 
+def publish_water_tanks_mqtt():
+    settings = get_settings()
+    client = mqtt.get_client()
+    if client:
+        # print("Publishing: {}".format(json.dumps(settings['water_tanks'], default=serialize_datetime, indent=4)))
+        client.publish(
+            settings[WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC], 
+            json.dumps(readWaterTankData(), default=serialize_datetime, indent=4), 
+            qos=1, 
+            retain=True
+        )
+
 class settings(ProtectedPage):
     """
     Load an html page for entering plugin settings.
@@ -1249,7 +1105,7 @@ class settings(ProtectedPage):
         if 'water_tank_id' in web.input():
             water_tank_id = web.input()["water_tank_id"]
 
-        # settings["water_tanks"] = settings["water_tanks"].values()        
+        settings[u"water_tanks"] = sorted(list(settings[u"water_tanks"].values()), key= lambda wt : wt["order"])
         print("Sending settings: {}".format(json.dumps(settings, default=serialize_datetime, indent=4)))
         return template_render.water_tank(settings, json.dumps(defaults, ensure_ascii=False), gv.pnames, water_tank_id, show_settings)  # open settings page
 
@@ -1321,12 +1177,14 @@ class save_water_tanks(ProtectedPage):
             if d[u"action"] == "add":
                 #add new water_Tank
                 # print('Adding new water tank: {}'.format(json.dumps(water_tank, default=serialize_datetime, indent=4)))
+                water_tank.order = len(settings['water_tanks'])
                 settings['water_tanks'][water_tank.id] = water_tank
             elif d[u"action"] == "update" and original_water_tank_id:
                 # print('Updating water tank with id: "{}". New values: {}'.format(original_water_tank_id, json.dumps(water_tank, default=serialize_datetime, indent=4)))
                 wt = settings['water_tanks'][original_water_tank_id]
                 # print('Old values: {}'.format(json.dumps(wt, default=serialize_datetime, indent=4)))
                 water_tank.last_updated = wt["last_updated"]
+                water_tank.order = wt["order"]
                 # if wt["sensor_measurement"]:
                 #     water_tank.UpdateSensorMeasurement(wt["sensor_measurement"])
                 if water_tank.id == original_water_tank_id:
@@ -1341,10 +1199,7 @@ class save_water_tanks(ProtectedPage):
 
         if d[u"id"] and (d[u"action"] == "add" or (d[u"action"] == "update" and original_water_tank_id)):
             refresh_mqtt_subscriptions()
-            client = mqtt.get_client()
-            if client:
-                # print("Publishing: {}".format(json.dumps(settings['water_tanks'], default=serialize_datetime, indent=4)))
-                client.publish(settings[WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC], json.dumps(settings['water_tanks'], default=serialize_datetime), qos=1, retain=True)
+            publish_water_tanks_mqtt()
             raise web.seeother(u"/water-tank-sp?water_tank_id=" + d[u"id"])
         else:
             raise web.seeother(u"/water-tank-sp")
@@ -1358,7 +1213,7 @@ class get_all(ProtectedPage):
         print(u"Reading water tank data")
         data = readWaterTankData()
         web.header('Content-Type', 'application/json')
-        return json.dumps(data, default=serialize_datetime)
+        return json.dumps(data, default=serialize_datetime, indent=4)
     
 
 class get_mqtt_settings(ProtectedPage):
@@ -1389,7 +1244,7 @@ class get_mqtt_settings(ProtectedPage):
                 s.close()
             settings['broker_host'] = IP
     
-        return json.dumps(settings, default=serialize_datetime)
+        return json.dumps(settings, default=serialize_datetime, indent=4)
 
 
 class delete(ProtectedPage)    :
@@ -1406,9 +1261,43 @@ class delete(ProtectedPage)    :
             del settings[u"water_tanks"][id]
             # print('Settings after delete:{}'.format(repr(settings)))            
             with open(DATA_FILE, u"w") as f:
-                json.dump(settings, f, default=serialize_datetime)  # save to file
+                json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file
             refresh_mqtt_subscriptions()
         raise web.seeother(u"/water-tank-sp")  # open settings page        
+
+
+class save_order(ProtectedPage):
+    """
+    Saves the order of a water tank
+    """
+    def POST(self):
+        data = web.input()
+        try:
+            print(repr(data))
+            id = data["water_tank_id"]
+            order = int(data["order"])
+            move = data["move"]
+            print('id: {}, move: {}, order: {}'.format(id, move, order))
+            settings = get_settings()
+            if id in settings[u"water_tanks"]:
+                previous_order = settings[u"water_tanks"][id]["order"]
+                for x in settings[u"water_tanks"]:
+                    if( x == id ):
+                        settings[u"water_tanks"][id]["order"] = order
+                    elif( move == "down" and settings[u"water_tanks"][x]["order"] >= order and settings[u"water_tanks"][x]["order"] < previous_order):
+                        settings[u"water_tanks"][x]["order"] += 1 
+                    elif( move == "up" and settings[u"water_tanks"][x]["order"] <= order and settings[u"water_tanks"][x]["order"] > previous_order):
+                        settings[u"water_tanks"][x]["order"] -= 1 
+                with open(DATA_FILE, u"w") as f:
+                    json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file
+
+                # publish all water-tank data for new order
+                publish_water_tanks_mqtt()
+                return json.dumps('{"success": true, "reason": ""}')
+            return json.dumps('{"success": false, "reason": "water tank with id [' + str(id) + '] was not found"}')
+        except Exception as e:
+            return json.dumps('{"success": false, "reason": "An exception occured: ' + e + '"}')
+
 
 
 #  Run when plugin is loaded
