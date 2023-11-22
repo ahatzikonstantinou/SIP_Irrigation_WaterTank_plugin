@@ -10,6 +10,33 @@ let txt = new DOMParser().parseFromString(str, "text/html");
 return txt.documentElement.textContent;
 
 }
+
+const WaterTankState = {
+    NORMAL : 1,
+    OVERFLOW : 2,
+    OVERFLOW_UNSAFE : 3,
+    WARNING : 4,
+    WARNING_UNSAFE : 5,
+    CRITICAL : 6,
+    CRITICAL_UNSAFE : 7
+}
+
+function getWaterTankStateName(stateValue)
+{
+    switch(stateValue){
+        case 1: return "NORMAL";
+        case 2: return "OVERFLOW";
+        case 3: return "OVERFLOW_UNSAFE";
+        case 4: return "WARNING";
+        case 5: return "WARNING_UNSAFE";
+        case 6: return "CRITICAL";
+        case 7: return "CRITICAL_UNSAFE";
+        default:
+            console.log("Unknown WaterTankState " + stateValue);
+            return null;
+    }
+}
+
     var defaults = JSON.parse(decode("$defaults"));
     // console.log(defaults);
     var water_tank_data;
@@ -114,10 +141,10 @@ return txt.documentElement.textContent;
                     const water_tanks = JSON.parse(message.payloadString);
                     console.log('Received MQTT message:', water_tanks);  
                     Object.keys(water_tanks).forEach(e => {
-                        //console.log(`key= $${e} value=$${water_tanks[e]}`);
+                        console.log(`key= $${e} value=$${water_tanks[e]}`);
                         const id = e;
                         const water_tank = water_tanks[e];
-                        //console.log('id: ' + id + ", water_tank: ", water_tank);
+                        console.log('id: ' + id + ", water_tank: ", water_tank);
                         let td = jQuery("td").filter(function() {
                             return $$(this).text() === id;
                         });
@@ -134,6 +161,48 @@ return txt.documentElement.textContent;
                         jQuery("#invalid_sensor_measurement").css({ visibility: (water_tank.invalid_sensor_measurement? "visible" : "hidden")});
                         jQuery("#percentage").val(water_tank.percentage != null ? Math.round(water_tank.percentage) : "");
 
+                        console.log("Checking whether to flash a state original_id:" +
+                            jQuery("#original_water_tank_id").val() +
+                            ", against id: " + water_tank.id);
+                        if(jQuery("#original_water_tank_id").val() == water_tank.id)
+                        {
+                            if([WaterTankState.OVERFLOW, WaterTankState.OVERFLOW_UNSAFE].includes(water_tank.state))
+                            {
+                                console.log("Flashing OVERFLOW");
+                                jQuery("[name=overflow_flash]").show();
+                                jQuery("#overflow_revert_button").prop('disabled', false);
+                            }
+                            else
+                            {
+                                console.log("Hiding OVERFLOW");
+                                jQuery("[name=overflow_flash]").hide();
+                                jQuery("#overflow_revert_button").prop('disabled', true);
+                            }
+                            if([WaterTankState.WARNING, WaterTankState.WARNING_UNSAFE].includes(water_tank.state))
+                            {
+                                console.log("Flashing WARNING");
+                                jQuery("[name=warning_flash]").show();
+                                jQuery("#warning_revert_button").prop('disabled', false);
+                            }
+                            else
+                            {
+                                console.log("Hiding WARNING");
+                                jQuery("[name=warning_flash]").hide();
+                                jQuery("#warning_revert_button").prop('disabled', true);
+                            }
+                            if([WaterTankState.CRITICAL, WaterTankState.CRITICAL_UNSAFE].includes(water_tank.state))
+                            {
+                                console.log("Flashing CRITICAL");
+                                jQuery("[name=critical_flash]").show();
+                                jQuery("#critical_revert_button").prop('disabled', false);
+                            }
+                            else
+                            {
+                                console.log("Hiding CRITICAL");
+                                jQuery("[name=critical_flash]").hide();
+                                jQuery("#critical_revert_button").prop('disabled', true);
+                            }
+                        }
                     });
                 }
                 catch(e)
@@ -307,16 +376,46 @@ return txt.documentElement.textContent;
         jQuery("#invalid_sensor_measurement").css({ visibility: (water_tank.invalid_sensor_measurement? "visible" : "hidden")});
         jQuery("#percentage").val(Math.round(water_tank.percentage));
 
+        if([WaterTankState.OVERFLOW, WaterTankState.OVERFLOW_UNSAFE].includes(water_tank.state))
+        {
+            jQuery("[name=overflow_flash]").show();
+            jQuery("#overflow_revert_button").prop('disabled', false);
+        }
+        else
+        {
+            jQuery("[name=overflow_flash]").hide();
+            jQuery("#overflow_revert_button").prop('disabled', true);
+        }
         jQuery("#overflow_level").val(water_tank.overflow_level);
         jQuery("#overflow_email").prop('checked', water_tank.overflow_email);
         jQuery("#overflow_xmpp").prop('checked', water_tank.overflow_xmpp);
         jQuery("#overflow_safe_level").val(water_tank.overflow_safe_level);
 
+        if([WaterTankState.WARNING, WaterTankState.WARNING_UNSAFE].includes(water_tank.state))
+        {
+            jQuery("[name=warning_flash]").show();
+            jQuery("#warning_revert_button").prop('disabled', false);
+        }
+        else
+        {
+            jQuery("[name=warning_flash]").hide();
+            jQuery("#warning_revert_button").prop('disabled', true);
+        }
         jQuery("#warning_level").val(water_tank.warning_level);
         jQuery("#warning_safe_level").val(water_tank.warning_safe_level);
         jQuery("#warning_email").prop('checked', water_tank.warning_email);
         jQuery("#warning_xmpp").prop('checked', water_tank.warning_xmpp);        
         
+        if([WaterTankState.CRITICAL, WaterTankState.CRITICAL_UNSAFE].includes(water_tank.state))
+        {
+            jQuery("[name=critical_flash]").show();
+            jQuery("#critical_revert_button").prop('disabled', false);
+        }
+        else
+        {
+            jQuery("[name=critical_flash]").hide();
+            jQuery("#critical_revert_button").prop('disabled', true);
+        }
         jQuery("#critical_level").val(water_tank.critical_level);
         jQuery("#critical_safe_level").val(water_tank.critical_safe_level);
         jQuery("#critical_email").prop('checked', water_tank.critical_email);
@@ -379,6 +478,54 @@ return txt.documentElement.textContent;
             default:
                 console.error("Uknown water tank type '" + type + "'");
         }
+    }
+
+    function disableOtherRunAndSiblingSuspend(state, id)
+    {
+        // disable sibling suspend checkbox
+        jQuery('#'+state+'_pr_suspend_'+id).prop('checked', false);
+        // console.log("Unchecked " + '#'+state+'_pr_suspend_'+id);
+
+        //disable other run programs in same state
+        $for i in range(0, len(pnames)):
+            jQuery('#'+state+'_pr_run_$i').prop('checked', false);
+            // console.log("Unchecked " + '#'+state+'_pr_run_$i');
+
+        jQuery('#'+state+'_pr_run_'+id).prop('checked', true);        
+        // console.log("Checked " + '#'+state+'_pr_run_'+id);
+    }
+
+    function revertPrograms()
+    {
+        const id = jQuery("#original_water_tank_id").val();
+        let water_tank = water_tank_data.find( w => {
+            return w.id === id;
+        });
+        if(water_tank == null)
+        {
+            alert("Water tank with id " + id + " not found in water tank data");
+        }
+        
+        if(!confirm("Revert will bring all programs as they were before the water tank entered state " +  getWaterTankStateName(water_tank.state)))
+        {
+            return;
+        }
+
+        jQuery.getJSON('water-tank-revert-programs', 
+            {
+                water_tank_id: id,
+                state: water_tank.state
+            },
+            function(data){
+            console.log('data:', data);
+            water_tank_data = data;
+            console.log('water_tank_data:', water_tank_data);
+
+            $if water_tank_id:
+                getWaterTankData("$water_tank_id");
+            $else:
+                jQuery("input[name=type][value=1]").click();
+        });   
     }
 </script>
 
@@ -563,7 +710,7 @@ return txt.documentElement.textContent;
             </div>
         </fieldset>
 
-        <div><span id="overflow_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Overflow')</h4><span id="overflow_flash" class="flash-event" hidden>&#x26A1;</span></div>
+        <div><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Overflow')</h4><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <p class="info">$_('Define at what % level an overflow occurs, which programs will run, the safe level % until which they will run, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">            
             <label>$_('Overflow Level'):</label><div><input id="overflow_level" name="overflow_level" type=number min=0 max=100/></div>
@@ -574,19 +721,19 @@ return txt.documentElement.textContent;
             </div>
             <div>
                 <label>$_('Programs'):</label>
-                <button type="button" class="revert" onclick='' disabled>$_('Revert')</button>
+                <button id="overflow_revert_button" type="button" class="revert" onclick='revertPrograms()' disabled>$_('Revert')</button>
             </div>
             <div style="display:flex; flex-wrap: wrap; width: fit-content;">
                 $for i in range(0, len(pnames)):
                     <label class="program">$pnames[i]
-                        <label class="program-action"><input id="overflow_pr_run_$i" name="overflow_pr_run_$i" type="checkbox" onclick="jQuery('#overflow_pr_suspend_$i').prop('checked', false);"/>$_('Run')</label>
+                        <label class="program-action"><input id="overflow_pr_run_$i" name="overflow_pr_run_$i" type="checkbox" onclick="disableOtherRunAndSiblingSuspend('overflow',$i);"/>$_('Run')</label>
                         <label class="program-action"><input id="overflow_pr_enable_$i" name="overflow_pr_enable_$i" type="checkbox" onclick="jQuery('#overflow_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
                         <label class="program-action"><input id="overflow_pr_suspend_$i" name="overflow_pr_suspend_$i" type="checkbox" onclick="jQuery('#overflow_pr_run_$i, #overflow_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
                     </label>
                 </div>            
         </fieldset>
 
-        <div><span id="warning_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Warning')</h4><span id="warning_flash" class="flash-event" hidden>&#x26A1;</span></div>
+        <div><span name="warning_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Warning')</h4><span name="warning_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <p class="info">$_('Define at what % level a warning occurs, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">
             <label>$_('Level'):</label><div><input id="warning_level" name="warning_level" type=number min=0 max=100/></div>
@@ -597,12 +744,12 @@ return txt.documentElement.textContent;
             </div>
             <div>
                 <label>$_('Programs'):</label>
-                <button type="button" class="revert" onclick=''>$_('Revert')</button>
+                <button  id="warning_revert_button"type="button" class="revert" onclick='revertPrograms()' disabled>$_('Revert')</button>
             </div>
             <div style="display:flex; flex-wrap: wrap; width: fit-content;">
                 $for i in range(0, len(pnames)):
                     <label class="program">$pnames[i]
-                        <label class="program-action"><input id="warning_pr_run_$i" name="warning_pr_run_$i" type="checkbox" onclick="jQuery('#warning_pr_suspend_$i').prop('checked', false);"/>$_('Run')</label>
+                        <label class="program-action"><input id="warning_pr_run_$i" name="warning_pr_run_$i" type="checkbox" onclick="disableOtherRunAndSiblingSuspend('warning',$i);"/>$_('Run')</label>
                         <label class="program-action"><input id="warning_pr_enable_$i" name="warning_pr_enable_$i" type="checkbox" onclick="jQuery('#warning_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
                         <label class="program-action"><input id="warning_pr_suspend_$i" name="warning_pr_suspend_$i" type="checkbox" onclick="jQuery('#warning_pr_run_$i, #warning_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
                     </label>
@@ -610,7 +757,7 @@ return txt.documentElement.textContent;
             
         </fieldset>
 
-        <div><span id="critical_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Critical')</h4><span id="critical_flash" class="flash-event" hidden>&#x26A1;</span></div>
+        <div><span name="critical_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Critical')</h4><span name="critical_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <p class="info">$_('Define which % level is critical, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">
             <label>$_('Level'):</label><div><input id="critical_level" name="critical_level" type=number min=0 max=100/></div>
@@ -621,12 +768,12 @@ return txt.documentElement.textContent;
             </div>
             <div>
                 <label>$_('Programs'):</label>
-                <button type="button" class="revert" onclick=''>$_('Revert')</button>
+                <button id="critical_revert_button" type="button" class="revert" onclick='revertPrograms()' disabled>$_('Revert')</button>
             </div>
             <div style="display:flex; flex-wrap: wrap; width: fit-content;">
                 $for i in range(0, len(pnames)):
                     <label class="program">$pnames[i]
-                        <label class="program-action"><input id="critical_pr_run_$i" name="critical_pr_run_$i" type="checkbox" onclick="jQuery('#critical_pr_suspend_$i').prop('checked', false);"/>$_('Run')</label>
+                        <label class="program-action"><input id="critical_pr_run_$i" name="critical_pr_run_$i" type="checkbox" onclick="disableOtherRunAndSiblingSuspend('critical',$i);"/>$_('Run')</label>
                         <label class="program-action"><input id="critical_pr_enable_$i" name="critical_pr_enable_$i" type="checkbox" onclick="jQuery('#critical_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
                         <label class="program-action"><input id="critical_pr_suspend_$i" name="critical_pr_suspend_$i" type="checkbox" onclick="jQuery('#critical_pr_run_$i, #critical_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
                     </label>

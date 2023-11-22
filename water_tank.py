@@ -13,6 +13,7 @@ from math import acos, pi, sqrt
 import xmpp
 import smtplib
 from email.mime.text import MIMEText
+import traceback # for exception debugging
 
 # local module imports
 from blinker import signal
@@ -90,35 +91,66 @@ class WaterTank(ABC):
         self.percentage = None
         self.order = None
         self.state = None
+        self.state_change_observers = []
+
+    def RegisterObserver(self, observer):
+        self.state_change_observers.append(observer)
 
     def InitFromDict(self, d):
         overflow_programs = {}
         warning_programs = {}
         critical_programs = {}
-        for i in range(0, len(gv.pnames)):
-            overflow_programs[i] = WaterTankProgram(
-                id = i,
-                run = ('overflow_pr_run_' + str(i) in d and str(d['overflow_pr_run_' + str(i)]) in ["on", "true", "True"]),
-                enable = ('overflow_pr_enable_' + str(i) in d and str(d['overflow_pr_enable_' + str(i)]) in ["on", "true", "True"]),
-                suspend = ('overflow_pr_suspend_' + str(i) in d and str(d['overflow_pr_suspend_' + str(i)]) in ["on", "true", "True"]),
-                original_enabled = None if 'overflow_original_enabled_pr' + str(i) not in d else d['overflow_original_enabled_pr' + str(i)]
-            )
-        
-            warning_programs[i] = WaterTankProgram(
-                id = i,
-                run = ('warning_pr_run_' + str(i) in d and str(d['warning_pr_run_' + str(i)]) in ["on", "true", "True"]),
-                enable = ('warning_pr_enable_' + str(i) in d and str(d['warning_pr_enable_' + str(i)]) in ["on", "true", "True"]),
-                suspend = ('warning_pr_suspend_' + str(i) in d and str(d['warning_pr_suspend_' + str(i)]) in ["on", "true", "True"]),
-                original_enabled = None if 'warning_original_enabled_pr' + str(i) not in d else d['warning_original_enabled_pr' + str(i)]
-            )
-        
-            critical_programs[i] = WaterTankProgram(
-                id = i,
-                run = ('critical_pr_run_' + str(i) in d and str(d['critical_pr_run_' + str(i)]) in ["on", "true", "True"]),
-                enable = ('critical_pr_enable_' + str(i) in d and str(d['critical_pr_enable_' + str(i)]) in ["on", "true", "True"]),
-                suspend = ('critical_pr_suspend_' + str(i) in d and str(d['critical_pr_suspend_' + str(i)]) in ["on", "true", "True"]),
-                original_enabled = None if 'critical_original_enabled_pr' + str(i) not in d else d['critical_original_enabled_pr' + str(i)]
-            )
+        #check if this dictionary came from file where fields are stored as dictionary objects
+        if("overflow_programs" in d or "warning_programs" in d or "critical_programs" in d):
+            for id, program in d['overflow_programs'].items():
+                overflow_programs[id] = WaterTankProgram(
+                    id = id,
+                    run = program["run"],
+                    enable = program["enable"],
+                    suspend = program["suspend"],
+                    original_enabled = program["original_enabled"]
+                )
+            for id, program in d['warning_programs'].items():            
+                warning_programs[id] = WaterTankProgram(
+                    id = id,
+                    run = program["run"],
+                    enable = program["enable"],
+                    suspend = program["suspend"],
+                    original_enabled = program["original_enabled"]
+                )
+            for id, program in d['critical_programs'].items():                        
+                critical_programs[id] = WaterTankProgram(
+                    id = id,
+                    run = program["run"],
+                    enable = program["enable"],
+                    suspend = program["suspend"],
+                    original_enabled = program["original_enabled"]
+                )
+        else:   #this dictionary came from form submission, fields are like overflow_pr_run_#
+            for i in range(0, len(gv.pnames)):
+                overflow_programs[i] = WaterTankProgram(
+                    id = i,
+                    run = ('overflow_pr_run_' + str(i) in d and str(d['overflow_pr_run_' + str(i)]) in ["on", "true", "True"]),
+                    enable = ('overflow_pr_enable_' + str(i) in d and str(d['overflow_pr_enable_' + str(i)]) in ["on", "true", "True"]),
+                    suspend = ('overflow_pr_suspend_' + str(i) in d and str(d['overflow_pr_suspend_' + str(i)]) in ["on", "true", "True"]),
+                    original_enabled = None if 'overflow_original_enabled_pr' + str(i) not in d else d['overflow_original_enabled_pr' + str(i)]
+                )
+            
+                warning_programs[i] = WaterTankProgram(
+                    id = i,
+                    run = ('warning_pr_run_' + str(i) in d and str(d['warning_pr_run_' + str(i)]) in ["on", "true", "True"]),
+                    enable = ('warning_pr_enable_' + str(i) in d and str(d['warning_pr_enable_' + str(i)]) in ["on", "true", "True"]),
+                    suspend = ('warning_pr_suspend_' + str(i) in d and str(d['warning_pr_suspend_' + str(i)]) in ["on", "true", "True"]),
+                    original_enabled = None if 'warning_original_enabled_pr' + str(i) not in d else d['warning_original_enabled_pr' + str(i)]
+                )
+            
+                critical_programs[i] = WaterTankProgram(
+                    id = i,
+                    run = ('critical_pr_run_' + str(i) in d and str(d['critical_pr_run_' + str(i)]) in ["on", "true", "True"]),
+                    enable = ('critical_pr_enable_' + str(i) in d and str(d['critical_pr_enable_' + str(i)]) in ["on", "true", "True"]),
+                    suspend = ('critical_pr_suspend_' + str(i) in d and str(d['critical_pr_suspend_' + str(i)]) in ["on", "true", "True"]),
+                    original_enabled = None if 'critical_original_enabled_pr' + str(i) not in d else d['critical_original_enabled_pr' + str(i)]
+                )
                 
         self.id = d["id"]
         self.label = d["label"]
@@ -150,10 +182,9 @@ class WaterTank(ABC):
         self.last_updated = None if 'last_updated' not in d else d["last_updated"]
         self.sensor_measurement = None if 'sensor_measurement' not in d else d["sensor_measurement"]
         self.invalid_sensor_measurement = None if 'invalid_sensor_measurement' not in d else d["invalid_sensor_measurement"]
-        self.percentage = None if 'percentage' not in d else d["percentage"]
+        self.percentage = None if 'percentage' not in d else float(d["percentage"])
         self.order = None if "order" not in d else int( d["order"])
         self.state = None if "state" not in d or d["state"] is None or d["state"] == "null" else WaterTankState( int(d["state"]) )
-
 
     def UpdateSensorMeasurement(self, sensor_id, measurement):
         self.last_updated = datetime.now().replace(microsecond=0)
@@ -232,27 +263,31 @@ class WaterTank(ABC):
         Put progams to their original enabled state.
         This method should called when exiting one of OVERFLOW, WARNING, CRITICAL states
         """
-        valid_states = [WaterTankState.OVERFLOW, WaterTankState.WARNING, WaterTankState.CRITICAL]
+        valid_states = [WaterTankState.OVERFLOW, WaterTankState.WARNING, WaterTankState.CRITICAL, WaterTankState.OVERFLOW_UNSAFE, WaterTankState.WARNING_UNSAFE, WaterTankState.CRITICAL_UNSAFE]
         if(state not in valid_states):
             raise Exception("Invalid state: '{}'. Only states {} allowed in ActivatePrograms".
-                            format(state.name, ", ".join(valid_states)))
+                            format(state.name, ", ".join([v.name for v in valid_states])))
         
         print("Reverting {} programs".format(state.name))
         prs = self.overflow_programs
-        if(state == WaterTankState.WARNING):
+        if(state in [WaterTankState.WARNING, WaterTankState.WARNING_UNSAFE]):
             prs = self.warning_programs
-        elif(state == WaterTankState.CRITICAL):
+        elif(state in [WaterTankState.CRITICAL, WaterTankState.CRITICAL_UNSAFE]):
             prs = self.critical_programs
 
         program_changed = False
         for i in range(0, len(gv.pd) ):
-            if(prs[i].original_enabled is not None and gv.pd[i]["enabled"] != prs[i].original_enabled):
-                gv.pd[i]["enabled"] = prs[i].original_enabled
+            key_i = str(i)
+            if(prs[key_i].original_enabled is not None and gv.pd[i]["enabled"] != prs[key_i].original_enabled):
+                print("{} program {}"
+                      .format(('Enable' if prs[key_i].original_enabled else 'Disable'), i))
+                gv.pd[i]["enabled"] = prs[key_i].original_enabled
                 program_changed = True
 
         if(program_changed):
             jsave(gv.pd, "programData")
             report_program_toggle()
+        print("RevertPrograms finished")
 
     def ActivatePrograms(self, state):
         """
@@ -262,7 +297,7 @@ class WaterTank(ABC):
         valid_states = [WaterTankState.OVERFLOW, WaterTankState.WARNING, WaterTankState.CRITICAL]
         if(state not in valid_states):
             raise Exception("Invalid state: '{}'. Only states {} allowed in ActivatePrograms".
-                            format(state.name, ", ".join(valid_states)))
+                            format(state.name, ", ".join([v.name for v in valid_states])))
         
         print("Enabling {} programs".format(state.name))
         prs = self.overflow_programs
@@ -272,24 +307,28 @@ class WaterTank(ABC):
             prs = self.critical_programs
 
         program_changed = False
-        for i in range(0, len(gv.pd) ):
-            if(prs[i].run):
-                print("Running program {}. {}".format(i, gv.pnames[i]))
-                run_program(i)
-            if(prs[i].suspend and gv.pd[i]["enabled"] == 1):
-                print("Disabling previously enabled program {}. {}".format(i, gv.pnames[i]))
-                prs[i].original_enabled = gv.pd[i]["enabled"]
-                gv.pd[i]["enabled"] = 0
-                program_changed = True
-            if(prs[i].enable and gv.pd[i]["enabled"] == 0):
-                print("Enabling previously disabled program {}. {}".format(i, gv.pnames[i]))
-                prs[i].original_enabled = gv.pd[i]["enabled"]
-                gv.pd[i]["enabled"] = 1
-                program_changed = True
+        try:
+            for i in range(0, len(gv.pd) ):
+                key_i = str(i)
+                if(prs[key_i].run):
+                    print("Running program {}. {}".format(i, gv.pnames[i]))
+                    run_program(i)
+                if(prs[key_i].suspend and gv.pd[i]["enabled"] == 1):
+                    print("Disabling previously enabled program {}. {}".format(i, gv.pnames[i]))
+                    prs[key_i].original_enabled = gv.pd[i]["enabled"]
+                    gv.pd[i]["enabled"] = 0
+                    program_changed = True
+                if(prs[key_i].enable and gv.pd[i]["enabled"] == 0):
+                    print("Enabling previously disabled program {}. {}".format(i, gv.pnames[i]))
+                    prs[key_i].original_enabled = gv.pd[i]["enabled"]
+                    gv.pd[i]["enabled"] = 1
+                    program_changed = True
 
-        if(program_changed):
-            jsave(gv.pd, "programData")
-            report_program_toggle()
+            if(program_changed):
+                jsave(gv.pd, "programData")
+                report_program_toggle()
+        except Exception as e:
+            print("Exception in ActivatePrograms state", e)
 
     def SetState(self):
         new_state = self.CalculateNewState()
@@ -317,205 +356,10 @@ class WaterTank(ABC):
             self.ActivatePrograms(new_state)
 
         self.state = new_state
-            
-    # def ObsoleteSetState(self, percentageBefore):
-    #     """
-    #     Set the state of the water tank. A measurement has been used to calculate
-    #     the new percentage, and self.state still holds the value it had from before
-    #     updating percentage.
-    #     """
-    #     print("SetState. percentage: {}".format(self.percentage))
-    #     if( self.percentage is None ):
-    #         self.state = None
-    #         return
-        
-    #     # entry to overflow for ***activating programs***: 
-    #     # overflow_level exists
-    #     # cross over overflow_level
-    #     # there is no previous measurement or 
-    #     # there is one lower than overflow_level and the tank is not already in OVERFLOW_UNSAFE
-    #     if( self.overflow_level is not None and 
-    #         self.percentage >= self.overflow_level and
-    #         (percentageBefore is None or ( self.state != WaterTankState.OVERFLOW_UNSAFE and percentageBefore < self.overflow_level) )
-    #     ):
-    #         print("Entered OVERFLOW, ***activating programs***")
-    #         self.state = WaterTankState.OVERFLOW
-    #         return
-        
-    #     # in overlfow
-    #     if( self.overflow_level is not None and 
-    #         self.percentage >= self.overflow_level  
-    #     ):
-    #         print("In OVERFLOW")
-    #         self.state = WaterTankState.OVERFLOW
-    #         return
-        
-    #     # exiting overflow when no overflow_safe_level exists for ***reverting programs***:
-    #     # tank is already in OVERFLOW
-    #     # level is lower than overflow_level
-    #     # there is no overflow_safe_level
-    #     if( self.state == WaterTankState.OVERFLOW and
-    #         self.percentage < self.overflow_level and
-    #         self.overflow_safe_level is None
-    #     ):
-    #         print("Exited OVERFLOW, no SAFE LEVEL, ***reverting programs***")            
-        
-    #     #entry to overflow_unsafe from overflow
-    #     if( self.state == WaterTankState.OVERFLOW and 
-    #         self.overflow_safe_level is not None and
-    #         percentageBefore is not None and
-    #         percentageBefore >= self.overflow_level and
-    #         self.percentage < self.overflow_level and  
-    #         self.percentage > self.overflow_safe_level
-    #     ):
-    #         print("Entered OVERFLOW_UNSAFE")
-    #         self.state = WaterTankState.OVERFLOW_UNSAFE
-    #         return
-        
-    #     # in overlfow unsafe
-    #     if( self.state == WaterTankState.OVERFLOW_UNSAFE and
-    #         self.overflow_safe_level is not None and 
-    #         self.percentage < self.overflow_level  and
-    #         self.percentage > self.overflow_safe_level  
-    #     ):
-    #         print("In OVERFLOW_UNSAFE")            
-    #         self.state = WaterTankState.OVERFLOW_UNSAFE
-    #         return
-                
-    #     # exiting OVERFLOW_UNSAFE to lower level for ***reverting programs***:
-    #     # tank is already in state OVERFLOW_UNSAFE
-    #     # level is lower than overflow_safe_level
-    #     if( self.state == WaterTankState.OVERFLOW_UNSAFE and
-    #         self.percentage < self.overflow_safe_level 
-    #     ):
-    #         print("Exited OVERFLOW_UNSAFE, ***reverting programs***")
-            
-    #     # entry to critical for ***activating programs***: 
-    #     # critical_level exists
-    #     # cross over critical_level
-    #     # there is no previous measurement or 
-    #     # there is one higher than critical_level and the tank is not already in CRITICAL_UNSAFE
-    #     if( self.critical_level is not None and 
-    #         self.percentage <= self.critical_level and
-    #         (percentageBefore is None or ( self.state != WaterTankState.CRITICAL_UNSAFE and percentageBefore > self.critical_level) )
-    #     ):
-    #         print("Entered CRITICAL, ***activating programs***")
-    #         self.state = WaterTankState.CRITICAL
-    #         return
-        
-    #     # in critical
-    #     if( self.critical_level is not None and
-    #         self.percentage <= self.critical_level
-    #     ):
-    #         print("In CRITICAL")            
-    #         self.state = WaterTankState.CRITICAL
-    #         return
 
-    #     # exiting critical when no critical_safe_level exists for ***reverting programs***:
-    #     # tank is already in CRITICAL
-    #     # level is lower than critical_level
-    #     # there is no critical_safe_level
-    #     if( self.state == WaterTankState.CRITICAL and
-    #         self.percentage > self.critical_level and
-    #         self.critical_safe_level is None
-    #     ):
-    #         print("Exited CRITICAL, no SAFE LEVEL, ***reverting programs***")            
-        
-    #     # entry to critical unsafe from critical
-    #     if( self.state == WaterTankState.CRITICAL and
-    #         self.critical_safe_level is not None and
-    #         percentageBefore is not None and
-    #         percentageBefore <= self.critical_level and
-    #         self.percentage > self.critical_level and 
-    #         self.percentage < self.critical_safe_level
-    #     ):
-    #         print("Entered CRITICAL_UNSAFE")
-    #         self.state = WaterTankState.CRITICAL_UNSAFE
-    #         return
-        
-    #     # in critical unsafe
-    #     if( self.state == WaterTankState.CRITICAL_UNSAFE and
-    #         self.critical_safe_level is not None and
-    #         self.percentage > self.critical_level and 
-    #         self.percentage < self.critical_safe_level
-    #     ):
-    #         print("In CRITICAL_UNSAFE")            
-    #         self.state = WaterTankState.CRITICAL_UNSAFE
-    #         return
-
-    #     # exiting CRITICAL_UNSAFE to higher level for ***reverting programs***:
-    #     # tank is already in state CRITICAL_UNSAFE
-    #     # level is higher than critical_safe_level
-    #     if( self.state == WaterTankState.CRITICAL_UNSAFE and
-    #         self.percentage > self.critical_safe_level 
-    #     ):
-    #         print("Exited CRITICAL_UNSAFE, ***reverting programs***")
-
-    #     # entry to warning for ***activating programs***: 
-    #     # warning_level exists
-    #     # cross over warning_level
-    #     # there is no previous measurement or 
-    #     # there is one higher than warning_level and the tank is not already in WARNING_UNSAFE
-    #     if( self.warning_level is not None and 
-    #         self.percentage <= self.warning_level and
-    #         (percentageBefore is None or ( self.state != WaterTankState.WARNING_UNSAFE and percentageBefore > self.warning_level) )
-    #     ):
-    #         print("Entered WARNING, ***activating programs***")
-    #         self.state = WaterTankState.WARNING
-    #         return
-        
-    #     # in warning
-    #     if( self.warning_level is not None and
-    #         self.percentage <= self.warning_level
-    #     ):
-    #         print("In WARNING")
-    #         self.state = WaterTankState.WARNING
-    #         return
-        
-    #     # exiting warning when no warning_safe_level exists for ***reverting programs***:
-    #     # tank is already in WARNING
-    #     # level is higher than warning_level
-    #     # there is no overflow_safe_level
-    #     if( self.state == WaterTankState.WARNING and
-    #         self.percentage > self.warning_level and
-    #         self.warning_safe_level is None
-    #     ):
-    #         print("Exited WARNING, no SAFE LEVEL, ***reverting programs***") 
-
-    #     # entry to warning unsafe from warning
-    #     if( self.state == WaterTankState.WARNING and
-    #         self.warning_safe_level is not None and
-    #         percentageBefore is not None and
-    #         percentageBefore <= self.warning_level and
-    #         self.percentage > self.warning_level and 
-    #         self.percentage < self.warning_safe_level
-    #     ):
-    #         print("Entered WARNING_UNSAFE")
-    #         self.state = WaterTankState.WARNING_UNSAFE
-    #         return
-        
-    #     # in warning unsafe
-    #     if( self.state == WaterTankState.WARNING_UNSAFE and
-    #         self.warning_safe_level is not None and
-    #         self.percentage > self.warning_level and 
-    #         self.percentage < self.warning_safe_level
-    #     ):
-    #         print("In WARNING_UNSAFE")            
-    #         self.state = WaterTankState.WARNING_UNSAFE
-    #         return
-        
-    #     # exiting WARNING_UNSAFE to higher level for ***reverting programs***:
-    #     # tank is already in state WARNING_UNSAFE
-    #     # level is higher than warning_safe_level
-    #     if( self.state == WaterTankState.OVERFLOW_UNSAFE and
-    #         self.percentage < self.warning_safe_level 
-    #     ):
-    #         print("Exited WARNING_UNSAFE, ***reverting programs***")
-        
-    #     # if the percentage is not in any of the level ranges
-    #     # it is normal
-    #     self.state = WaterTankState.NORMAL
-
+        for o in self.state_change_observers:
+            o.WaterTankStateChanged(self)
+    
 
 class WaterTankRectangular(WaterTank):
     def __init__(self, id = None, label = None, width = None, length = None, height = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_safe_level = None, warning_email = None, warning_xmpp = None, warning_programs = None, critical_level = None, critical_safe_level = None, critical_email = None, critical_xmpp = None, critical_programs = None, loss_email = None, loss_xmpp = None):
@@ -688,6 +532,97 @@ class WaterTankFactory():
         #         wt.percentage = settings["water_tanks"][wt.id]["percentage"]
 
         return wt
+
+
+class MessageSender():
+    def __init__(self, mqtt_msg, water_tank):
+        self.mqtt_msg = mqtt_msg
+        self.water_tank = water_tank
+        self.percentage_mark = None
+
+        self.water_tank.RegisterObserver(self)
+
+    def WaterTankStateChanged(self, water_tank):
+        settings = get_settings()
+
+        if( water_tank.state == WaterTankState.OVERFLOW ):
+            print("Will send overflow message")
+            msg = settings[XMPP_OVERFLOW_MSG].format(
+                water_tank_id = water_tank.id,
+                water_tank_label = water_tank.label,
+                sensor_id = water_tank.sensor_id,
+                percentage = water_tank.percentage,
+                measurement = water_tank.sensor_measurement,
+                last_updated = water_tank.last_updated,
+                mqtt_topic = self.mqtt_msg.topic,
+                additional_info = water_tank.AdditionalInfo4Msg()
+            )
+            print("Overflow email:{}, xmpp:{}".format(water_tank.overflow_email, water_tank.overflow_xmpp))
+            if( water_tank.overflow_xmpp ):
+                xmpp_send_msg( msg )
+            if( water_tank.overflow_email ):
+                email_send_msg( msg, "Overflow" )
+        elif( water_tank.state == WaterTankState.CRITICAL ):
+            print("Will send xmpp critical message")
+            msg = settings[XMPP_CRITICAL_MSG].format(
+                water_tank_id = water_tank.id,
+                water_tank_label = water_tank.label,
+                sensor_id = water_tank.sensor_id,
+                percentage = water_tank.percentage,
+                measurement = water_tank.sensor_measurement,
+                last_updated = water_tank.last_updated,
+                mqtt_topic = self.mqtt_msg.topic,
+                additional_info = water_tank.AdditionalInfo4Msg()
+            )
+            print("Critical email:{}, xmpp:{}".format(water_tank.critical_email, water_tank.critical_xmpp))
+            if( water_tank.critical_xmpp ):
+                xmpp_send_msg( msg )
+            if( water_tank.critical_email ):
+                email_send_msg( msg, "Critical" )
+        elif( water_tank.state == WaterTankState.WARNING ):
+            print("Will send xmpp warning message")
+            msg = settings[XMPP_WARNING_MSG].format(
+                water_tank_id = water_tank.id,
+                water_tank_label = water_tank.label,
+                sensor_id = water_tank.sensor_id,
+                percentage = water_tank.percentage,
+                measurement = water_tank.sensor_measurement,
+                last_updated = water_tank.last_updated,
+                mqtt_topic = self.mqtt_msg.topic,
+                additional_info = water_tank.AdditionalInfo4Msg()
+            )
+            print("Warning email:{}, xmpp:{}".format(water_tank.warning_email, water_tank.warning_xmpp))
+            if( water_tank.warning_xmpp ):
+                xmpp_send_msg( msg )
+            if( water_tank.warning_email ):
+                email_send_msg( msg, "Warning" )
+
+    def MarkPercentage(self):
+        self.percentage_mark = self.water_tank.percentage
+
+    def PercentageUpdated(self):
+        settings = get_settings()
+
+        if( self.water_tank.percentage is not None and 
+        (self.percentage_mark is not None and self.percentage_mark > self.water_tank.percentage) and
+        no_stations_are_on()
+        ):
+            print("Will send xmpp water loss message")
+            msg = settings[XMPP_WATER_LOSS_MSG].format(
+                water_tank_id = self.water_tank.id,
+                water_tank_label = self.water_tank.label,
+                sensor_id = self.water_tank.sensor_id,
+                percentage = self.water_tank.percentage,
+                measurement = self.water_tank.sensor_measurement,
+                last_updated = self.water_tank.last_updated,
+                mqtt_topic = self.mqtt_msg.topic,
+                additional_info = self.water_tank.AdditionalInfo4Msg()
+            )
+            print("Water Loss email:{}, xmpp:{}".format(self.water_tank.loss_email, self.water_tank.loss_xmpp))
+            if( self.water_tank.loss_xmpp ):
+                xmpp_send_msg( msg )
+            if( self.water_tank.loss_email ):
+                email_send_msg( msg, "Water Loss" )
 
 
 DATA_FILE = u"./data/water_tank.json"
@@ -1018,7 +953,8 @@ urls.extend([
     u"/water-tank-get-all", u"plugins.water_tank.get_all",
     u"/water-tank-get_mqtt_settings", u"plugins.water_tank.get_mqtt_settings",
     u"/water-tank-delete", u"plugins.water_tank.delete",
-    u"/water-tank-save-order", u"plugins.water_tank.save_order"
+    u"/water-tank-save-order", u"plugins.water_tank.save_order",
+    u"/water-tank-revert-programs", u"plugins.water_tank.revert_programs"
     ])
 # fmt: on
 
@@ -1038,7 +974,11 @@ def serialize_datetime(obj):
     elif  isinstance(obj, WaterTankProgram):
         return obj.__dict__
     elif  isinstance(obj, WaterTank):
-        return obj.__dict__
+        val = obj.__dict__.copy()
+        val.pop("state_change_observers")  # do not serialze observer objects
+        return val
+    elif isinstance(obj, MessageSender):
+        return
     raise TypeError("Type {} not serializable".format(type(obj))) 
 
 
@@ -1241,107 +1181,106 @@ def send_invalid_measurement_msg(water_tank, additional_info):
         email_send_msg( msg, "Invalid measurement" )
 
 
-def check_events_and_send_msg(cmd, percentageBefore, water_tank, mqtt_msg):
-    percentage = water_tank.percentage
-    print("Checking events for percentageBefore:'{}', percentage:'{}', water-tank:'{}' ".format(
-        percentageBefore, percentage, water_tank.label
-    ))
-    if percentage is None:
-        return
+# def check_events_and_send_msg(cmd, percentageBefore, water_tank, mqtt_msg):
+#     percentage = water_tank.percentage
+#     print("Checking events for percentageBefore:'{}', percentage:'{}', water-tank:'{}' ".format(
+#         percentageBefore, percentage, water_tank.label
+#     ))
+#     if percentage is None:
+#         return
     
-    settings = get_settings()
-    if( water_tank.overflow_level is not None and 
-        water_tank.percentage is not None and
-        water_tank.percentage >= water_tank.overflow_level and  
-        (percentageBefore is None or percentageBefore < water_tank.overflow_level) 
-      ):
-        print("Will send overflow message")
-        msg = settings[XMPP_OVERFLOW_MSG].format(
-            water_tank_id = water_tank.id,
-            water_tank_label = water_tank.label,
-            sensor_id = water_tank.sensor_id,
-            percentage = water_tank.percentage,
-            measurement = water_tank.sensor_measurement,
-            last_updated = water_tank.last_updated,
-            mqtt_topic = mqtt_msg.topic,
-            additional_info = water_tank.AdditionalInfo4Msg()
-        )
-        print("Overflow email:{}, xmpp:{}".format(water_tank.overflow_email, water_tank.overflow_xmpp))
-        if( water_tank.overflow_xmpp ):
-            xmpp_send_msg( msg )
-        if( water_tank.overflow_email ):
-            email_send_msg( msg, "Overflow" )
+#     settings = get_settings()
+#     if( water_tank.overflow_level is not None and 
+#         water_tank.percentage is not None and
+#         water_tank.percentage >= water_tank.overflow_level and  
+#         (percentageBefore is None or percentageBefore < water_tank.overflow_level) 
+#       ):
+#         print("Will send overflow message")
+#         msg = settings[XMPP_OVERFLOW_MSG].format(
+#             water_tank_id = water_tank.id,
+#             water_tank_label = water_tank.label,
+#             sensor_id = water_tank.sensor_id,
+#             percentage = water_tank.percentage,
+#             measurement = water_tank.sensor_measurement,
+#             last_updated = water_tank.last_updated,
+#             mqtt_topic = mqtt_msg.topic,
+#             additional_info = water_tank.AdditionalInfo4Msg()
+#         )
+#         print("Overflow email:{}, xmpp:{}".format(water_tank.overflow_email, water_tank.overflow_xmpp))
+#         if( water_tank.overflow_xmpp ):
+#             xmpp_send_msg( msg )
+#         if( water_tank.overflow_email ):
+#             email_send_msg( msg, "Overflow" )
 
-    if( water_tank.critical_level is not None and 
-        water_tank.percentage is not None and
-        water_tank.percentage <= water_tank.critical_level and  
-        (percentageBefore is None or percentageBefore > water_tank.critical_level) 
-      ):
-        print("Will send xmpp critical message")
-        msg = settings[XMPP_CRITICAL_MSG].format(
-            water_tank_id = water_tank.id,
-            water_tank_label = water_tank.label,
-            sensor_id = water_tank.sensor_id,
-            percentage = water_tank.percentage,
-            measurement = water_tank.sensor_measurement,
-            last_updated = water_tank.last_updated,
-            mqtt_topic = mqtt_msg.topic,
-            additional_info = water_tank.AdditionalInfo4Msg()
-        )
-        print("Critical email:{}, xmpp:{}".format(water_tank.critical_email, water_tank.critical_xmpp))
-        if( water_tank.critical_xmpp ):
-            xmpp_send_msg( msg )
-        if( water_tank.critical_email ):
-            email_send_msg( msg, "Critical" )
+#     if( water_tank.critical_level is not None and 
+#         water_tank.percentage is not None and
+#         water_tank.percentage <= water_tank.critical_level and  
+#         (percentageBefore is None or percentageBefore > water_tank.critical_level) 
+#       ):
+#         print("Will send xmpp critical message")
+#         msg = settings[XMPP_CRITICAL_MSG].format(
+#             water_tank_id = water_tank.id,
+#             water_tank_label = water_tank.label,
+#             sensor_id = water_tank.sensor_id,
+#             percentage = water_tank.percentage,
+#             measurement = water_tank.sensor_measurement,
+#             last_updated = water_tank.last_updated,
+#             mqtt_topic = mqtt_msg.topic,
+#             additional_info = water_tank.AdditionalInfo4Msg()
+#         )
+#         print("Critical email:{}, xmpp:{}".format(water_tank.critical_email, water_tank.critical_xmpp))
+#         if( water_tank.critical_xmpp ):
+#             xmpp_send_msg( msg )
+#         if( water_tank.critical_email ):
+#             email_send_msg( msg, "Critical" )
 
-    elif( water_tank.warning_level is not None and 
-        water_tank.percentage is not None and
-        water_tank.percentage <= water_tank.warning_level and  
-        (percentageBefore is None or percentageBefore > water_tank.warning_level) 
-      ):
-        print("Will send xmpp warning message")
-        msg = settings[XMPP_WARNING_MSG].format(
-            water_tank_id = water_tank.id,
-            water_tank_label = water_tank.label,
-            sensor_id = water_tank.sensor_id,
-            percentage = water_tank.percentage,
-            measurement = water_tank.sensor_measurement,
-            last_updated = water_tank.last_updated,
-            mqtt_topic = mqtt_msg.topic,
-            additional_info = water_tank.AdditionalInfo4Msg()
-        )
-        print("Warning email:{}, xmpp:{}".format(water_tank.warning_email, water_tank.warning_xmpp))
-        if( water_tank.warning_xmpp ):
-            xmpp_send_msg( msg )
-        if( water_tank.warning_email ):
-            email_send_msg( msg, "Warning" )
+#     elif( water_tank.warning_level is not None and 
+#         water_tank.percentage is not None and
+#         water_tank.percentage <= water_tank.warning_level and  
+#         (percentageBefore is None or percentageBefore > water_tank.warning_level) 
+#       ):
+#         print("Will send xmpp warning message")
+#         msg = settings[XMPP_WARNING_MSG].format(
+#             water_tank_id = water_tank.id,
+#             water_tank_label = water_tank.label,
+#             sensor_id = water_tank.sensor_id,
+#             percentage = water_tank.percentage,
+#             measurement = water_tank.sensor_measurement,
+#             last_updated = water_tank.last_updated,
+#             mqtt_topic = mqtt_msg.topic,
+#             additional_info = water_tank.AdditionalInfo4Msg()
+#         )
+#         print("Warning email:{}, xmpp:{}".format(water_tank.warning_email, water_tank.warning_xmpp))
+#         if( water_tank.warning_xmpp ):
+#             xmpp_send_msg( msg )
+#         if( water_tank.warning_email ):
+#             email_send_msg( msg, "Warning" )
 
 
-    # print("Will check water loss water_tank.loss_xmpp: {}, water_tank.percentage: {}, percentageBefore: {}, water_tank.percentage: {}".format(water_tank.loss_xmpp, water_tank.percentage, percentageBefore, water_tank.percentage))
-    if( water_tank.percentage is not None and 
-        (percentageBefore is not None and percentageBefore > water_tank.percentage) and
-        no_stations_are_on()
-        ):
-        print("Will send xmpp water loss message")
-        msg = settings[XMPP_WATER_LOSS_MSG].format(
-            water_tank_id = water_tank.id,
-            water_tank_label = water_tank.label,
-            sensor_id = water_tank.sensor_id,
-            percentage = water_tank.percentage,
-            measurement = water_tank.sensor_measurement,
-            last_updated = water_tank.last_updated,
-            mqtt_topic = mqtt_msg.topic,
-            additional_info = water_tank.AdditionalInfo4Msg()
-        )
-        print("Water Loss email:{}, xmpp:{}".format(water_tank.loss_email, water_tank.loss_xmpp))
-        if( water_tank.loss_xmpp ):
-            xmpp_send_msg( msg )
-        if( water_tank.loss_email ):
-            email_send_msg( msg, "Water Loss" )
+#     # print("Will check water loss water_tank.loss_xmpp: {}, water_tank.percentage: {}, percentageBefore: {}, water_tank.percentage: {}".format(water_tank.loss_xmpp, water_tank.percentage, percentageBefore, water_tank.percentage))
+#     if( water_tank.percentage is not None and 
+#         (percentageBefore is not None and percentageBefore > water_tank.percentage) and
+#         no_stations_are_on()
+#         ):
+#         print("Will send xmpp water loss message")
+#         msg = settings[XMPP_WATER_LOSS_MSG].format(
+#             water_tank_id = water_tank.id,
+#             water_tank_label = water_tank.label,
+#             sensor_id = water_tank.sensor_id,
+#             percentage = water_tank.percentage,
+#             measurement = water_tank.sensor_measurement,
+#             last_updated = water_tank.last_updated,
+#             mqtt_topic = mqtt_msg.topic,
+#             additional_info = water_tank.AdditionalInfo4Msg()
+#         )
+#         print("Water Loss email:{}, xmpp:{}".format(water_tank.loss_email, water_tank.loss_xmpp))
+#         if( water_tank.loss_xmpp ):
+#             xmpp_send_msg( msg )
+#         if( water_tank.loss_email ):
+#             email_send_msg( msg, "Water Loss" )
 
 
 def updateSensorMeasurementFromCmd(cmd, water_tanks, msg):
-    settings = get_settings()
     associated_wts = [ wt for wt in list(water_tanks.values()) if wt["sensor_id"] == cmd["sensor_id"]]
     if len(associated_wts) == 0:
         send_unassociated_sensor_msg(
@@ -1354,14 +1293,18 @@ def updateSensorMeasurementFromCmd(cmd, water_tanks, msg):
     
     water_tank_updated = False
     for awt in associated_wts:
+        # print("Doing {}".format(awt["id"]))
         wt = WaterTankFactory.FromDict(awt)
-        # print("Wt from {}".format(json.dumps(awt, default=serialize_datetime, indent=4)))
+        # print("Wt from {}".format(json.dumps(wt, default=serialize_datetime, indent=4)))
         # print("Before UpdateSensorMeasurement. awt['enabled']:{}, wt.enabled:{}".format(awt['enabled'], wt.enabled))
-        percentageBefore = wt.percentage
+        msgSender = MessageSender(msg, wt)
+        msgSender.MarkPercentage()
         if wt.UpdateSensorMeasurement(cmd[u"sensor_id"], cmd[u"measurement"]):
             water_tanks[wt.id] = wt.__dict__
             # print("After UpdateSensorMeasurement. water_tanks[wt.id]['enabled']:{}, wt.enabled:{}".format(water_tanks[wt.id]['enabled'], wt.enabled))        
+            # print("After wt.UpdateSensorMeasurement {}".format(json.dumps(wt, default=serialize_datetime, indent=4)))
             # check_events_and_send_msg(cmd, percentageBefore, wt, msg)
+            msgSender.PercentageUpdated()
             water_tank_updated = True
             # print("Update water tank '{}' with measurment: {}".format(wt.id, wt.sensor_measurement))
 
@@ -1385,6 +1328,7 @@ def on_sensor_mqtt_message(client, msg):
         settings = get_settings()
         water_tanks = settings[u"water_tanks"]
         water_tank_updated = False
+        # print("Before updateSensorMeasurementFromCmd water_tanks: {}".format(json.dumps(settings[u"water_tanks"], default=serialize_datetime, indent=4)))
         if isinstance(cmd, dict) and 'sensor_id' in cmd:
             water_tank_updated = updateSensorMeasurementFromCmd(cmd, water_tanks, msg)
         elif isinstance(cmd, list):
@@ -1406,12 +1350,14 @@ def on_sensor_mqtt_message(client, msg):
             return
         
         settings[u"water_tanks"] = water_tanks
+        # print("Saving water_tanks: {}".format(json.dumps(settings[u"water_tanks"], default=serialize_datetime, indent=4)))
         with open(DATA_FILE, u"w") as f:
                 json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file                
 
         publish_water_tanks_mqtt()
     except Exception as e:
-        print("An unexpected error occured", e)
+        print("Exception in on_sensor_mqtt_message. ", e)
+        traceback.print_exc()
 
 
 def on_data_request_mqtt_message(client, msg):
@@ -1488,7 +1434,8 @@ class settings(ProtectedPage):
         if 'water_tank_id' in web.input():
             water_tank_id = web.input()["water_tank_id"]
 
-        settings[u"water_tanks"] = sorted(list(settings[u"water_tanks"].values()), key= lambda wt : wt["order"])
+        if( len(settings[u"water_tanks"]) > 0 ):
+            settings[u"water_tanks"] = sorted(list(settings[u"water_tanks"].values()), key= lambda wt : wt["order"])
         # print("Sending settings: {}".format(json.dumps(settings, default=serialize_datetime, indent=4)))
         return template_render.water_tank(settings, json.dumps(defaults, ensure_ascii=False), gv.pnames, water_tank_id, show_settings)  # open settings page
 
@@ -1568,6 +1515,7 @@ class save_water_tanks(ProtectedPage):
                 # print('Old values: {}'.format(json.dumps(wt, default=serialize_datetime, indent=4)))
                 water_tank.last_updated = wt["last_updated"]
                 water_tank.order = wt["order"]
+                water_tank.state = wt["state"]
                 # if wt["sensor_measurement"]:
                 #     water_tank.UpdateSensorMeasurement(wt["sensor_measurement"])
                 if water_tank.id == original_water_tank_id:
@@ -1681,6 +1629,22 @@ class save_order(ProtectedPage):
         except Exception as e:
             return json.dumps('{"success": false, "reason": "An exception occured: ' + e + '"}')
 
+
+class revert_programs(ProtectedPage):
+    def GET(self):
+        data = web.input()
+        try:
+            id = data["water_tank_id"]
+            state = WaterTankState( int(data["state"]) )
+            print('id: {}, state: {}'.format(id, state.name))
+            settings = get_settings()
+            if id in settings[u"water_tanks"]:
+                wt = WaterTankFactory.FromDict(settings[u"water_tanks"][id])
+                wt.RevertPrograms(state)
+                return '{"success": true, "reason": ""}'
+            return '{"success": false, "reason": "water tank with id [' + str(id) + '] was not found"}'
+        except Exception as e:
+            return '{"success": false, "reason": "An exception occured: ' + e + '"}'
 
 
 #  Run when plugin is loaded
