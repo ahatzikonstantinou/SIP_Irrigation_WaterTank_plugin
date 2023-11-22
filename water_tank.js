@@ -2,30 +2,32 @@ $(document).ready(function() {
   //
   // get all water tank info for initial setup
 
-  function template(id, label, percentage, sensor_error, last_updated, state="" )
+  function template(water_tank, state="" )
   {
-    console.log(`Will generate tr for id: ${id}, label: ${label}, percentage: ${percentage}, sensor_error: ${sensor_error}, last_updated: ${last_updated}, state: "${state}"`);
+    // console.log(`Will generate tr for id: ${water_tank.id}, label: ${water_tank.label}, percentage: ${water_tank.percentage}, sensor_error: ${water_tank.invalid_sensor_measurement}, last_updated: ${water_tank.last_updated}, state: "${state}"`);
     let str_percentage = "";
     let width_percentage = 0;
-
+    let last_updated = water_tank.last_updated;
     if(last_updated == null)
     {
       last_updated = "";
     }
-    if(sensor_error)
+    if(water_tank.invalid_sensor_measurement)
     {
       state = "sensor_error";
     }
-    else if(percentage != null)
+    else if(water_tank.percentage != null)
     {
-      percentage = Math.round(percentage);
+      let percentage = Math.round(water_tank.percentage);
       str_percentage = percentage + "%";
       width_percentage = percentage;
     }
-    
-    return `<tr id="${id}">
+    let hidden = !water_tank.enabled ? "hidden" : "";
+    // console.log(`Water_tank_id:${water_tank.id}, enabled: ${water_tank.enabled}, hidden:${hidden}`);
+
+    return `<tr id="${water_tank.id}" ${hidden}>
       <td style="white-space: nowrap;">
-        <div class="water-tank-label">${label}</div>
+        <div class="water-tank-label">${water_tank.label}</div>
         <div class="last_updated">${last_updated}</div></td>
       <td style="width:100%">
         <div style="width: 100%;
@@ -80,15 +82,8 @@ $(document).ready(function() {
         $('#options').after(single_water_tank_div);
       }
 
-      $.each( data, function( i, item ) {
-        let tr = template(
-          item.id, 
-          item.label, 
-          item.percentage, 
-          item.invalid_sensor_measurement, 
-          item.last_updated,
-          DetermineWaterTankState(item));
-
+      $.each( data, function( i, water_tank ) {
+        let tr = template( water_tank, DetermineWaterTankState(water_tank) );
         $('#water_tank_table').append(tr);
 
       });  
@@ -133,27 +128,19 @@ $(document).ready(function() {
 
     // called when a message arrives
     function onMessageArrived(message) {
-      console.log("onMessageArrived:"+message.payloadString);
+      // console.log("onMessageArrived:"+message.payloadString);
       try
       {
         const water_tanks = JSON.parse(message.payloadString);
         Object.keys(water_tanks).forEach(e => {
-            console.log(`key= $${e} value=$${water_tanks[e]}`);
+            // console.log(`key= $${e} value=$${water_tanks[e]}`);
             const id = e;
             const water_tank = water_tanks[e];
-            console.log('id: ' + id + ", water_tank: ", water_tank);
+            // console.log('id: ' + id + ", water_tank: ", water_tank);
             
             if(water_tank.invalid_sensor_measurement)
             {
-              $(`#${water_tank.id}`).replaceWith( 
-                ( template(
-                    water_tank.id, 
-                    water_tank.label, 
-                    water_tank.percentage, 
-                    water_tank.invalid_sensor_measurement,
-                    water_tank.last_updated) 
-                ) 
-              );
+              $(`#${water_tank.id}`).replaceWith( template( water_tank ) );
             }
             else if(water_tank.percentage != null)
             {
@@ -174,17 +161,9 @@ $(document).ready(function() {
               {
                 state = "overflow";
               }              
-              $(`#${water_tank.id}`).replaceWith( 
-                ( template(
-                    water_tank.id, 
-                    water_tank.label, 
-                    water_tank.percentage,
-                    water_tank.invalid_sensor_measurement,
-                    water_tank.last_updated,
-                    DetermineWaterTankState(water_tank)) 
-                ) 
-              );
+              $(`#${water_tank.id}`).replaceWith( template( water_tank, DetermineWaterTankState(water_tank) ) );
             }
+            
         });        
       }
       catch(e)

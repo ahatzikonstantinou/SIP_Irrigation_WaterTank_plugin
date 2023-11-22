@@ -23,8 +23,9 @@ form.water-tank input{
 
 
 .water-tank fieldset.two-col label{
-    display: inline-block;
+    /* display: inline-block; */
     white-space: normal;  /*this will wrap words on whitespace*/
+    margin-bottom: 0.5em;
 }
 
 .water-tank fieldset.one-col{
@@ -56,12 +57,36 @@ form.water-tank input{
 }
 
 .water-tank h4{
+    display: inline-block;
     margin-bottom: 4px;
     margin-top: 20px;
     text-decoration-line: underline;
     text-underline-offset: 2px;
     text-decoration-color: #404040;
     color: #404040;
+}
+
+
+@-webkit-keyframes water-tank-event {    
+    from, to {    
+        color: transparent    
+    }    
+    50% {    
+        color: black
+    }    
+}    
+@keyframes water-tank-event {    
+    from, to {    
+        color: transparent    
+    }    
+    50% {    
+        color: black
+    }   
+}    
+
+.water-tank span.flash-event {
+    -webkit-animation: water-tank-event 1s step-end infinite;    
+    animation: water-tank-event 1s step-end infinite;  
 }
 
 .water-tank table{
@@ -105,9 +130,9 @@ form.water-tank input{
 }
 
 .water-tank button.reset {
-    display: block;
+    /* display: block; */
     margin: 2px;
-    font-size: large;
+    /* font-size: large; */
     background-color: lightskyblue;
 }
 
@@ -183,6 +208,36 @@ form.water-tank input{
     margin-left: 2px;
     padding-bottom: 8px;
     background-size: 22px;
+}
+
+.water-tank .program {
+    font-weight: bold;
+    color: #353535;
+    min-width: auto;
+    width: fit-content;
+}
+
+.water-tank .program-action {
+    font-size: smaller;
+    font-family: monospace;
+    color: #2E3959;
+}
+
+.water-tank input[type=checkbox]{
+    vertical-align: middle;
+    position: relative;
+    margin-right: 2px;
+}
+
+.water-tank button.deactivate {
+    display: block;
+    margin: 2px;
+    font-size: large;
+    background-color: lightskyblue;
+}
+
+.water-tank button.revert {
+    vertical-align: text-top;
 }
 
 .percent-bar.sensor_error {

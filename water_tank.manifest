@@ -17,4 +17,6 @@ additional-methods.min.js static/scripts
 jquery.validate.min.js static/scripts
 mqttws31.js static/scripts
 warning-icon24x24.png static/images
+down-arrow.png static/images
+up-arrow.png static/images
 water_tank.manifest plugins/manifests

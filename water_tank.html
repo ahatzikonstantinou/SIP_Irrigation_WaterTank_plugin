@@ -226,15 +226,46 @@ return txt.documentElement.textContent;
             }
         });
         
+        jQuery.validator.addMethod("greaterThan", function (value, element, param) {
+            let otherElement = jQuery(param);
+            return parseInt(value, 10) > parseInt(otherElement.val(), 10);
+        });
+        
+        jQuery.validator.addMethod("lessThan", function (value, element, param) {
+            let otherElement = jQuery(param);
+            return parseInt(value, 10) < parseInt(otherElement.val(), 10);
+        });
+        
         jQuery("#pluginFormWaterTanks").validate({
             rules: {
                 id: {
                     pattern: /^[a-zA-Z0-9_]+$$/
+                },
+                overflow_safe_level: {
+                    number: true,
+                    lessThan: "#overflow_level"
+                },
+                warning_safe_level: {
+                    number: true,
+                    greaterThan: "#warning_level"
+                },
+                critical_safe_level: {
+                    number: true,
+                    greaterThan: "#critical_level"
                 }
             },
             messages: {
                 id: {
                     pattern: 'Only letters, numbers, and underscores are allowed'
+                },
+                overflow_safe_level: {
+                    lessThan: "Overflow safe level must be less than than overflow level"
+                },
+                warning_safe_level: {
+                    greaterThan: "Warning safe level must be greater than warning level"
+                },
+                critical_safe_level: {
+                    greaterThan: "Critical safe level must be greater than critical level"
                 }
             }
         });
@@ -280,25 +311,28 @@ return txt.documentElement.textContent;
         jQuery("#overflow_email").prop('checked', water_tank.overflow_email);
         jQuery("#overflow_xmpp").prop('checked', water_tank.overflow_xmpp);
         jQuery("#overflow_safe_level").val(water_tank.overflow_safe_level);
-        $for pn in pnames:
-            jQuery("#overflow_program_$pn").prop('checked', water_tank.overflow_programs["$pn"]);
-        
+
         jQuery("#warning_level").val(water_tank.warning_level);
+        jQuery("#warning_safe_level").val(water_tank.warning_safe_level);
         jQuery("#warning_email").prop('checked', water_tank.warning_email);
         jQuery("#warning_xmpp").prop('checked', water_tank.warning_xmpp);        
-        $for pn in pnames:
-            jQuery("#warning_suspend_program_$pn").prop('checked', water_tank.warning_suspend_programs[$pn]);
-        $for pn in pnames:
-            jQuery("#warning_activate_program_$pn").prop('checked', water_tank.warning_activate_programs[$pn]);
         
         jQuery("#critical_level").val(water_tank.critical_level);
+        jQuery("#critical_safe_level").val(water_tank.critical_safe_level);
         jQuery("#critical_email").prop('checked', water_tank.critical_email);
         jQuery("#critical_xmpp").prop('checked', water_tank.critical_xmpp);
-        $for pn in pnames:
-            jQuery("#critical_suspend_program_$pn").prop('checked', water_tank.critical_suspend_programs[$pn]);
-        $for pn in pnames:
-            jQuery("#critical_activate_program_$pn").prop('checked', water_tank.critical_activate_programs[$pn]);
 
+        $for i in range(0, len(pnames)):
+            jQuery("#overflow_pr_run_$i").prop('checked', water_tank.overflow_programs["$i"].run);
+            jQuery("#overflow_pr_enable_$i").prop('checked', water_tank.overflow_programs["$i"].enable);
+            jQuery("#overflow_pr_suspend_$i").prop('checked', water_tank.overflow_programs["$i"].suspend);
+            jQuery("#warning_pr_run_$i").prop('checked', water_tank.warning_programs["$i"].run);
+            jQuery("#warning_pr_enable_$i").prop('checked', water_tank.warning_programs["$i"].enable);
+            jQuery("#warning_pr_suspend_$i").prop('checked', water_tank.warning_programs["$i"].suspend);
+            jQuery("#critical_pr_run_$i").prop('checked', water_tank.critical_programs["$i"].run);
+            jQuery("#critical_pr_enable_$i").prop('checked', water_tank.critical_programs["$i"].enable);
+            jQuery("#critical_pr_suspend_$i").prop('checked', water_tank.critical_programs["$i"].suspend);
+        
         jQuery("#loss_email").prop('checked', water_tank.loss_email);
         jQuery("#loss_xmpp").prop('checked', water_tank.loss_xmpp);
 
@@ -391,7 +425,7 @@ return txt.documentElement.textContent;
                 <fieldset class="two-col">
                     <div>
                         <label>$_('Unrecognised message'):</label>
-                        <button type="button" class="reset" onclick='jQuery("#unrecognised_msg").val(defaults.unrecognised_msg);'>&#x21bb;</button>
+                        <button type="button" class="reset" onclick='jQuery("#unrecognised_msg").val(defaults.unrecognised_msg);'>$_('reset')</button>
                     </div>
                     <div>
                         <textarea id="unrecognised_msg" name="unrecognised_msg" data-exclude-keywords="water_tank_id,water_tank_label,sensor_id,percentage,measurement,last_updated,additional_info" data-extra-keywords="date,message">$settings['unrecognised_msg']</textarea>
@@ -404,7 +438,7 @@ return txt.documentElement.textContent;
 
                     <div>
                         <label>$_('Unassociated-Sensor message'):</label>
-                        <button type="button" class="reset" onclick='jQuery("#xmpp_unassociated_sensor_msg").val(defaults.xmpp_unassociated_sensor_msg);'>&#x21bb;</button>
+                        <button type="button" class="reset" onclick='jQuery("#xmpp_unassociated_sensor_msg").val(defaults.xmpp_unassociated_sensor_msg);'>$_('reset')</button>
                     </div>
                     <div>
                         <textarea id="xmpp_unassociated_sensor_msg" name="xmpp_unassociated_sensor_msg" data-exclude-keywords="water_tank_id,water_tank_label,additional_info,percentage">$settings['xmpp_unassociated_sensor_msg']</textarea>
@@ -417,7 +451,7 @@ return txt.documentElement.textContent;
 
                     <div>
                         <label>$_('Invalid Sensor Measurement message'):</label>
-                        <button type="button" class="reset" onclick="jQuery('#xmpp_invalid_sensor_measurement_msg').val(defaults.xmpp_invalid_sensor_measurement_msg);">&#x21bb;</button>
+                        <button type="button" class="reset" onclick="jQuery('#xmpp_invalid_sensor_measurement_msg').val(defaults.xmpp_invalid_sensor_measurement_msg);">$_('reset')</button>
                     </div>
                     <div>
                         <textarea id="xmpp_invalid_sensor_measurement_msg" name="xmpp_invalid_sensor_measurement_msg">$settings['xmpp_invalid_sensor_measurement_msg']</textarea>
@@ -425,7 +459,7 @@ return txt.documentElement.textContent;
                     
                     <div>
                         <label>$_('Overflow message'):</label>
-                        <button type="button" class="reset" onclick="jQuery('#xmpp_overflow_msg').val(defaults.xmpp_overflow_msg);">&#x21bb;</button>
+                        <button type="button" class="reset" onclick="jQuery('#xmpp_overflow_msg').val(defaults.xmpp_overflow_msg);">$_('reset')</button>
                     </div>
                     <div>
                         <textarea id="xmpp_overflow_msg" name="xmpp_overflow_msg">$settings['xmpp_overflow_msg']</textarea>
@@ -433,7 +467,7 @@ return txt.documentElement.textContent;
                         
                     <div>
                         <label>$_('Warning message'):</label>
-                        <button type="button" class="reset" onclick="jQuery('#xmpp_warning_msg').val(defaults.xmpp_warning_msg);">&#x21bb;</button>
+                        <button type="button" class="reset" onclick="jQuery('#xmpp_warning_msg').val(defaults.xmpp_warning_msg);">$_('reset')</button>
                     </div>
                     <div>
                         <textarea id="xmpp_warning_msg" name="xmpp_warning_msg">$settings['xmpp_warning_msg']</textarea>
@@ -441,7 +475,7 @@ return txt.documentElement.textContent;
                         
                     <div>
                         <label>$_('Critical message'):</label>
-                        <button type="button" class="reset" onclick="jQuery('#xmpp_critical_msg').val(defaults.xmpp_critical_msg);">&#x21bb;</button>
+                        <button type="button" class="reset" onclick="jQuery('#xmpp_critical_msg').val(defaults.xmpp_critical_msg);">$_('reset')</button>
                     </div>
                     <div>
                         <textarea id="xmpp_critical_msg" name="xmpp_critical_msg">$settings['xmpp_critical_msg']</textarea>
@@ -449,7 +483,7 @@ return txt.documentElement.textContent;
                         
                     <div>
                         <label>$_('Water Loss message'):</label>
-                        <button type="button" class="reset" onclick="jQuery('#water_loss_msg').val(defaults.water_loss_msg);">&#x21bb;</button>
+                        <button type="button" class="reset" onclick="jQuery('#water_loss_msg').val(defaults.water_loss_msg);">$_('reset')</button>
                     </div>
                     <div>
                         <textarea id="water_loss_msg" name="water_loss_msg">$settings['water_loss_msg']</textarea>
@@ -485,7 +519,7 @@ return txt.documentElement.textContent;
                     $ sensor_error = 'sensor_error' if tank['invalid_sensor_measurement'] else ''
                     <td class="$sensor_error">$tank['id']</td>
                     <td>$tank['label']</td>
-                    $ str_percentage = str(round(tank['percentage'])) + '%' if tank['percentage'] else ''
+                    $ str_percentage = str(round(float(tank['percentage']))) + '%' if tank['percentage'] else ''
                     <td>$str_percentage</td>
                     <td>$tank['last_updated']</td>
                     $ checked = 'checked="checked"' if tank['enabled'] else ''
@@ -529,7 +563,7 @@ return txt.documentElement.textContent;
             </div>
         </fieldset>
 
-        <h4>$_('Overflow')</h4>
+        <div><span id="overflow_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Overflow')</h4><span id="overflow_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <p class="info">$_('Define at what % level an overflow occurs, which programs will run, the safe level % until which they will run, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">            
             <label>$_('Overflow Level'):</label><div><input id="overflow_level" name="overflow_level" type=number min=0 max=100/></div>
@@ -538,46 +572,65 @@ return txt.documentElement.textContent;
                 <label>Email<input id="overflow_email" name="overflow_email" type="checkbox"/></label>
                 <label>Xmpp<input id="overflow_xmpp" name="overflow_xmpp" type="checkbox"/></label>
             </div>
-            <label>$_('Run Programs'):</label><div style="display:flex; flex-wrap: wrap;">
-                $for pn in pnames:
-                    <label>$pn<input id="overflow_program_$pn" name="overflow_program_$pn" type="checkbox"/></label>
+            <div>
+                <label>$_('Programs'):</label>
+                <button type="button" class="revert" onclick='' disabled>$_('Revert')</button>
+            </div>
+            <div style="display:flex; flex-wrap: wrap; width: fit-content;">
+                $for i in range(0, len(pnames)):
+                    <label class="program">$pnames[i]
+                        <label class="program-action"><input id="overflow_pr_run_$i" name="overflow_pr_run_$i" type="checkbox" onclick="jQuery('#overflow_pr_suspend_$i').prop('checked', false);"/>$_('Run')</label>
+                        <label class="program-action"><input id="overflow_pr_enable_$i" name="overflow_pr_enable_$i" type="checkbox" onclick="jQuery('#overflow_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
+                        <label class="program-action"><input id="overflow_pr_suspend_$i" name="overflow_pr_suspend_$i" type="checkbox" onclick="jQuery('#overflow_pr_run_$i, #overflow_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
+                    </label>
                 </div>            
         </fieldset>
 
-        <h4>$_('Warning')</h4>
+        <div><span id="warning_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Warning')</h4><span id="warning_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <p class="info">$_('Define at what % level a warning occurs, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">
             <label>$_('Level'):</label><div><input id="warning_level" name="warning_level" type=number min=0 max=100/></div>
+            <label>$_('Safe level'):</label><div><input id="warning_safe_level" name="warning_safe_level" type=number min=0 max=100/></div>
             <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
                 <label>Email<input id="warning_email" name="warning_email" type="checkbox"/></label>
                 <label>Xmpp<input id="warning_xmpp" name="warning_xmpp" type="checkbox"/></label>
             </div>
-            <label>$_('Suspend Programs'):</label><div style="display:flex; flex-wrap: wrap;">
-                $for pn in pnames:
-                    <label>$pn<input id="warning_suspend_program_$pn" name="warning_suspend_program_$pn" type="checkbox"/></label>
+            <div>
+                <label>$_('Programs'):</label>
+                <button type="button" class="revert" onclick=''>$_('Revert')</button>
+            </div>
+            <div style="display:flex; flex-wrap: wrap; width: fit-content;">
+                $for i in range(0, len(pnames)):
+                    <label class="program">$pnames[i]
+                        <label class="program-action"><input id="warning_pr_run_$i" name="warning_pr_run_$i" type="checkbox" onclick="jQuery('#warning_pr_suspend_$i').prop('checked', false);"/>$_('Run')</label>
+                        <label class="program-action"><input id="warning_pr_enable_$i" name="warning_pr_enable_$i" type="checkbox" onclick="jQuery('#warning_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
+                        <label class="program-action"><input id="warning_pr_suspend_$i" name="warning_pr_suspend_$i" type="checkbox" onclick="jQuery('#warning_pr_run_$i, #warning_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
+                    </label>
                 </div>
-            <label>$_('Activate Programs'):</label><div style="display:flex; flex-wrap: wrap;">
-                $for pn in pnames:
-                    <label>$pn<input id="warning_activate_program_$pn" name="warning_activate_program_$pn" type="checkbox"/></label>
-                </div>
+            
         </fieldset>
 
-        <h4>$_('Critical')</h4>
+        <div><span id="critical_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Critical')</h4><span id="critical_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <p class="info">$_('Define which % level is critical, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">
             <label>$_('Level'):</label><div><input id="critical_level" name="critical_level" type=number min=0 max=100/></div>
+            <label>$_('Safe level'):</label><div><input id="critical_safe_level" name="critical_safe_level" type=number min=0 max=100/></div>
             <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
                 <label>Email<input id="critical_email" name="critical_email" type="checkbox"/></label>
                 <label>Xmpp<input id="critical_xmpp" name="critical_xmpp" type="checkbox"/></label>
             </div>
-            <label>$_('Suspend Programs'):</label><div style="display:flex; flex-wrap: wrap;">
-                $for pn in pnames:
-                    <label>$pn<input id="critical_suspend_program_$pn" name="critical_suspend_program_$pn" type="checkbox"/></label>
-                </div>
-            <label>$_('Activate Programs'):</label><div style="display:flex; flex-wrap: wrap;">
-                $for pn in pnames:
-                    <label>$pn<input id="critical_activate_program_$pn" name="critical_activate_program_$pn" type="checkbox"/></label>
-                </div>
+            <div>
+                <label>$_('Programs'):</label>
+                <button type="button" class="revert" onclick=''>$_('Revert')</button>
+            </div>
+            <div style="display:flex; flex-wrap: wrap; width: fit-content;">
+                $for i in range(0, len(pnames)):
+                    <label class="program">$pnames[i]
+                        <label class="program-action"><input id="critical_pr_run_$i" name="critical_pr_run_$i" type="checkbox" onclick="jQuery('#critical_pr_suspend_$i').prop('checked', false);"/>$_('Run')</label>
+                        <label class="program-action"><input id="critical_pr_enable_$i" name="critical_pr_enable_$i" type="checkbox" onclick="jQuery('#critical_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
+                        <label class="program-action"><input id="critical_pr_suspend_$i" name="critical_pr_suspend_$i" type="checkbox" onclick="jQuery('#critical_pr_run_$i, #critical_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
+                    </label>
+                </div>                    
         </fieldset>
 
         <h4>$_('Water Loss')</h4>
