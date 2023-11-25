@@ -1,4 +1,4 @@
-$def with(settings, defaults, pnames, water_tank_id, show_settings)
+$def with(settings, defaults, pnames, snames, water_tank_id, show_settings)
 
 $var title: $_('SIP Water-Tank Plugin')
 $var page: water_tank_plugin  
@@ -67,8 +67,10 @@ function getWaterTankStateName(stateValue)
                 return;
             }
 
-            jQuery("#action").val("update");            
-            jQuery("#pluginFormWaterTanks").submit();
+            jQuery("#pluginFormWaterTanks").valid();
+
+            // jQuery("#action").val("update");            
+            // jQuery("#pluginFormWaterTanks").submit();
         });
 
         jQuery("button#cDelete").click(function(){
@@ -297,14 +299,39 @@ function getWaterTankStateName(stateValue)
         
         jQuery.validator.addMethod("greaterThan", function (value, element, param) {
             let otherElement = jQuery(param);
+            if(otherElement.val().trim().length == 0 && element.val().trim().length == 0)
+            {
+                return true;
+            }
             return parseInt(value, 10) > parseInt(otherElement.val(), 10);
         });
         
         jQuery.validator.addMethod("lessThan", function (value, element, param) {
             let otherElement = jQuery(param);
+            if(otherElement.val().trim().length == 0 && element.val().trim().length == 0)
+            {
+                return true;
+            }
             return parseInt(value, 10) < parseInt(otherElement.val(), 10);
         });
         
+        jQuery.validator.addMethod("timeOrPercentage", function(value, element) {
+            if(!jQuery(element).is(":checked"))
+            {
+                return true;
+            }
+            time = jQuery(element).closest("div[class=station").find("input[type=number]").first().val();
+            //percentage = jQuery(element).closest("div[class=station").find("input[type=number]").last().val();
+
+            return time.length > 0; // || percentage.length > 0;
+            },
+            "Specify Time"
+        );
+
+        jQuery.validator.addClassRules("station_run", {
+            timeOrPercentage: true
+        });
+
         jQuery("#pluginFormWaterTanks").validate({
             rules: {
                 id: {
@@ -335,6 +362,16 @@ function getWaterTankStateName(stateValue)
                 },
                 critical_safe_level: {
                     greaterThan: "Critical safe level must be greater than critical level"
+                }
+            },
+            errorPlacement: function(error, element) {
+                if(jQuery(element).hasClass("station_run"))
+                {
+                    error.insertAfter(jQuery(element).parent());
+                }
+                else
+                {
+                    error.insertAfter(element)
                 }
             }
         });
@@ -432,6 +469,17 @@ function getWaterTankStateName(stateValue)
             jQuery("#critical_pr_enable_$i").prop('checked', water_tank.critical_programs["$i"].enable);
             jQuery("#critical_pr_suspend_$i").prop('checked', water_tank.critical_programs["$i"].suspend);
         
+        $for i in range(0, len(snames)):
+            jQuery("#overflow_sn_run_$i").prop('checked', water_tank.overflow_stations["$i"].run);
+            jQuery("#overflow_sn_minutes_$i").val(water_tank.overflow_stations["$i"].minutes);
+            jQuery("#overflow_sn_percentage_$i").val(water_tank.overflow_stations["$i"].percentage);
+            jQuery("#warning_sn_run_$i").prop('checked', water_tank.warning_stations["$i"].run);
+            jQuery("#warning_sn_minutes_$i").val(water_tank.warning_stations["$i"].minutes);
+            jQuery("#warning_sn_percentage_$i").val(water_tank.warning_stations["$i"].percentage);
+            jQuery("#critical_sn_run_$i").prop('checked', water_tank.critical_stations["$i"].run);
+            jQuery("#critical_sn_minutes_$i").val(water_tank.critical_stations["$i"].minutes);
+            jQuery("#critical_sn_percentage_$i").val(water_tank.critical_stations["$i"].percentage);
+
         jQuery("#loss_email").prop('checked', water_tank.loss_email);
         jQuery("#loss_xmpp").prop('checked', water_tank.loss_xmpp);
 
@@ -480,19 +528,29 @@ function getWaterTankStateName(stateValue)
         }
     }
 
-    function disableOtherRunAndSiblingSuspend(state, id)
+    function disableOtherRunAndSiblingSuspend(program_checkbox, state, id)
     {
+        if(program_checkbox.checked == false)
+        {
+            return;
+        }
+
         // disable sibling suspend checkbox
         jQuery('#'+state+'_pr_suspend_'+id).prop('checked', false);
         // console.log("Unchecked " + '#'+state+'_pr_suspend_'+id);
 
-        //disable other run programs in same state
+        //uncheck other run programs in same state
         $for i in range(0, len(pnames)):
             jQuery('#'+state+'_pr_run_$i').prop('checked', false);
             // console.log("Unchecked " + '#'+state+'_pr_run_$i');
 
         jQuery('#'+state+'_pr_run_'+id).prop('checked', true);        
         // console.log("Checked " + '#'+state+'_pr_run_'+id);
+
+        //uncheck other run stations in same state
+        $for i in range(0, len(snames)):
+            jQuery('#'+state+'_sn_run_$i').prop('checked', false);
+            // console.log("Unchecked " + '#'+state+'_pr_run_$i');
     }
 
     function revertPrograms()
@@ -527,6 +585,19 @@ function getWaterTankStateName(stateValue)
                 jQuery("input[name=type][value=1]").click();
         });   
     }
+
+    function uncheckRunPrograms(station_checkbox, state, id)
+    {
+        if(station_checkbox.checked == false)
+        {
+            return;
+        }
+
+        //uncheck other run programs in same state
+        $for i in range(0, len(pnames)):
+            jQuery('#'+state+'_pr_run_$i').prop('checked', false);
+            // console.log("Unchecked " + '#'+state+'_pr_run_$i');
+    }
 </script>
 
 <div id="plugin" class="water-tank">
@@ -535,8 +606,14 @@ function getWaterTankStateName(stateValue)
     </div>
     <hr>
         <details>
-            <summary>MQTT, XMPP, Email, Messages</summary>
+            <summary>Stations, MQTT, XMPP, Email, Messages</summary>
             <form id="pluginFormSettings" class="water-tank" action="/water-tank-save-settings" method="post">
+                <h3>$_('Stations')</h3>
+                <p class="info">$_('SIP will run stations if an OVERFLOW, WARNING, or CRITICAL percentage is reached. For such occassions this is the maximum allowed duration a station will run in minutes.')</p>
+                <fieldset class="two-col">
+                    <label>$_('Max Station Duration (mins)'):</label><input type="number" id="max_station_duration" name="max_station_duration" min="0" value="$settings['max_station_duration']" required/>
+                </fieldset>
+                <hr>
                 <h3>MQTT</h3>
                 <p class="info">$_('SIP will listen for incomming messages in the Subscribe topic. As soon as message arrives, SIP will publish all water tank data to the Publish topic. The broker ws port is required for the Paho javascript library, please note that for a broker like mosquitto this is a different listener port than the standard 1883.')</p>
                 <fieldset class="two-col">
@@ -710,6 +787,15 @@ function getWaterTankStateName(stateValue)
             </div>
         </fieldset>
 
+        <h4>$_('Water Loss')</h4>
+        <p class="info">$_('When sensors report decreasing water level but no valves are open, water is leaking or being stolen. Specify which emails and xmpp accounts to notify.')</p>
+        <fieldset class="two-col">
+            <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
+                <label>Email<input id="loss_email" name="loss_email" type="checkbox"/></label>
+                <label>Xmpp<input id="loss_xmpp" name="loss_xmpp" type="checkbox"/></label>
+            </div>
+        </fieldset>
+
         <div><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Overflow')</h4><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <p class="info">$_('Define at what % level an overflow occurs, which programs will run, the safe level % until which they will run, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">            
@@ -726,11 +812,26 @@ function getWaterTankStateName(stateValue)
             <div style="display:flex; flex-wrap: wrap; width: fit-content;">
                 $for i in range(0, len(pnames)):
                     <label class="program">$pnames[i]
-                        <label class="program-action"><input id="overflow_pr_run_$i" name="overflow_pr_run_$i" type="checkbox" onclick="disableOtherRunAndSiblingSuspend('overflow',$i);"/>$_('Run')</label>
+                        <label class="program-action"><input id="overflow_pr_run_$i" name="overflow_pr_run_$i" type="checkbox" onclick="disableOtherRunAndSiblingSuspend(this,'overflow',$i);"/>$_('Run')</label>
                         <label class="program-action"><input id="overflow_pr_enable_$i" name="overflow_pr_enable_$i" type="checkbox" onclick="jQuery('#overflow_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
                         <label class="program-action"><input id="overflow_pr_suspend_$i" name="overflow_pr_suspend_$i" type="checkbox" onclick="jQuery('#overflow_pr_run_$i, #overflow_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
                     </label>
-                </div>            
+            </div>
+            <div>
+                <label>$_('Stations'):</label>
+            </div>
+            <div style="display:flex; flex-wrap: wrap; width: fit-content;">
+                $for i in range(0, len(snames)):
+                <div class="station">
+                    <label class="station">
+                        <input class="station_run" id="overflow_sn_run_$i" name="overflow_sn_run_$i" type="checkbox" onclick="uncheckRunPrograms(this,'overflow',$i);"/>
+                        $snames[i]
+                    </label>
+                    <label class="station-action">
+                        <input class="duration" id="overflow_sn_minutes_$i" name="overflow_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
+                    <label class="station-action"><input class="percentage" id="overflow_sn_percentage_$i" name="overflow_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>       
+                </div>             
+            </div>     
         </fieldset>
 
         <div><span name="warning_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Warning')</h4><span name="warning_flash" class="flash-event" hidden>&#x26A1;</span></div>
@@ -748,13 +849,27 @@ function getWaterTankStateName(stateValue)
             </div>
             <div style="display:flex; flex-wrap: wrap; width: fit-content;">
                 $for i in range(0, len(pnames)):
-                    <label class="program">$pnames[i]
-                        <label class="program-action"><input id="warning_pr_run_$i" name="warning_pr_run_$i" type="checkbox" onclick="disableOtherRunAndSiblingSuspend('warning',$i);"/>$_('Run')</label>
-                        <label class="program-action"><input id="warning_pr_enable_$i" name="warning_pr_enable_$i" type="checkbox" onclick="jQuery('#warning_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
-                        <label class="program-action"><input id="warning_pr_suspend_$i" name="warning_pr_suspend_$i" type="checkbox" onclick="jQuery('#warning_pr_run_$i, #warning_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
+                <label class="program">$pnames[i]
+                    <label class="program-action"><input id="warning_pr_run_$i" name="warning_pr_run_$i" type="checkbox" onclick="disableOtherRunAndSiblingSuspend(this,'warning',$i);"/>$_('Run')</label>
+                    <label class="program-action"><input id="warning_pr_enable_$i" name="warning_pr_enable_$i" type="checkbox" onclick="jQuery('#warning_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
+                    <label class="program-action"><input id="warning_pr_suspend_$i" name="warning_pr_suspend_$i" type="checkbox" onclick="jQuery('#warning_pr_run_$i, #warning_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
+                </label>
+            </div>
+            <div>
+                <label>$_('Stations'):</label>
+            </div>
+            <div style="display:flex; flex-wrap: wrap; width: fit-content;">
+                $for i in range(0, len(snames)):
+                <div class="station">
+                    <label class="station">
+                        <input class="station_run" id="warning_sn_run_$i" name="warning_sn_run_$i" type="checkbox" onclick="uncheckRunPrograms(this,'warning',$i);"/>
+                        $snames[i]
                     </label>
-                </div>
-            
+                    <label class="station-action">
+                        <input class="duration" id="warning_sn_minutes_$i" name="warning_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
+                    <label class="station-action"><input class="percentage" id="warning_sn_percentage_$i" name="warning_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>       
+                </div>             
+            </div> 
         </fieldset>
 
         <div><span name="critical_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Critical')</h4><span name="critical_flash" class="flash-event" hidden>&#x26A1;</span></div>
@@ -772,23 +887,29 @@ function getWaterTankStateName(stateValue)
             </div>
             <div style="display:flex; flex-wrap: wrap; width: fit-content;">
                 $for i in range(0, len(pnames)):
-                    <label class="program">$pnames[i]
-                        <label class="program-action"><input id="critical_pr_run_$i" name="critical_pr_run_$i" type="checkbox" onclick="disableOtherRunAndSiblingSuspend('critical',$i);"/>$_('Run')</label>
-                        <label class="program-action"><input id="critical_pr_enable_$i" name="critical_pr_enable_$i" type="checkbox" onclick="jQuery('#critical_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
-                        <label class="program-action"><input id="critical_pr_suspend_$i" name="critical_pr_suspend_$i" type="checkbox" onclick="jQuery('#critical_pr_run_$i, #critical_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
+                <label class="program">$pnames[i]
+                    <label class="program-action"><input id="critical_pr_run_$i" name="critical_pr_run_$i" type="checkbox" onclick="disableOtherRunAndSiblingSuspend(this,'critical',$i);"/>$_('Run')</label>
+                    <label class="program-action"><input id="critical_pr_enable_$i" name="critical_pr_enable_$i" type="checkbox" onclick="jQuery('#critical_pr_suspend_$i').prop('checked', false);"/>$_('Enable')</label>
+                    <label class="program-action"><input id="critical_pr_suspend_$i" name="critical_pr_suspend_$i" type="checkbox" onclick="jQuery('#critical_pr_run_$i, #critical_pr_enable_$i').prop('checked', false);"/>$_('Suspend')</label>
+                </label>
+            </div>           
+            <div>
+                <label>$_('Stations'):</label>
+            </div>
+            <div style="display:flex; flex-wrap: wrap; width: fit-content;">
+                $for i in range(0, len(snames)):
+                <div class="station">
+                    <label class="station">
+                        <input class="station_run" id="critical_sn_run_$i" name="critical_sn_run_$i" type="checkbox" onclick="uncheckRunPrograms(this,'critical',$i);"/>
+                        $snames[i]
                     </label>
-                </div>                    
+                    <label class="station-action">
+                        <input class="duration" id="critical_sn_minutes_$i" name="critical_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
+                    <label class="station-action"><input class="percentage" id="critical_sn_percentage_$i" name="critical_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>       
+                </div>             
+            </div>          
         </fieldset>
 
-        <h4>$_('Water Loss')</h4>
-        <p class="info">$_('When sensors report decreasing water level but no valves are open, water is leaking or being stolen. Specify which emails and xmpp accounts to notify.')</p>
-        <fieldset class="two-col">
-            <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
-                <label>Email<input id="loss_email" name="loss_email" type="checkbox"/></label>
-                <label>Xmpp<input id="loss_xmpp" name="loss_xmpp" type="checkbox"/></label>
-            </div>
-            
-        </fieldset>  
         </br>
         <div class="controls">
             <button id="cAddNew" class="submit"><b>$_('Add New')</b></button>
@@ -798,5 +919,7 @@ function getWaterTankStateName(stateValue)
         </div>
         
     </form>
+    <!--Use the following button to validate the water-tank form without submitting so you have time to see the error messages-->
+    <!-- <button id="cUpdate" onclick="jQuery('#pluginFormWaterTanks').valid();" disabled="true"><b>$_('Update')</b></button> -->
 
 </div>

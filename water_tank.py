@@ -26,7 +26,7 @@ from webpages import showInFooter # Enable plugin to display readings in UI foot
 from webpages import showOnTimeline # Enable plugin to display station data on timeline
 from webpages import report_program_toggle 
 from plugins import mqtt
-from helpers import load_programs, jsave, run_program, stop_stations
+from helpers import load_programs, jsave, run_program, stop_stations, schedule_stations, report_stations_scheduled
 
 
 class WaterTankType(IntEnum):
@@ -66,19 +66,21 @@ class WaterTankStation():
     This is a station that will run when the water tank enters a state
     for a certain amount of time or until a certain percentage is reached
     """
-    def __init__(self, station_id, hours,  minutes, percentage):
+    def __init__(self, station_id, run, minutes, percentage, start_datetime = None, end_datetime = None):
         self.station_id = station_id
-        self.hours = hours
+        self.run = run
         self.minutes = minutes
         self.percentage = percentage
+        self.start_datetime = start_datetime
+        self.end_datetime = end_datetime
 
-    def FromDict(d):
-        station_id = None if "station_id" not in d else int(d["station_id"])
-        hours = None if "hours" not in d else int(d["hours"])
-        minutes = None if "minutes" not in d else int(d["minutes"])
-        percentage = None if "percentage" not in d else float(d["percentage"])
+    # def FromDict(d):
+    #     station_id = None if "station_id" not in d else int(d["station_id"])
+    #     run = None if "hours" not in d else int(d["hours"])
+    #     minutes = None if "minutes" not in d else int(d["minutes"])
+    #     percentage = None if "percentage" not in d else float(d["percentage"])
 
-        return WaterTankStation(station_id, hours, minutes, percentage)
+    #     return WaterTankStation(station_id, hours, minutes, percentage)
         
 
 class WaterTank(ABC):
@@ -133,6 +135,10 @@ class WaterTank(ABC):
         overflow_programs = {}
         warning_programs = {}
         critical_programs = {}
+        overflow_stations = {}
+        warning_stations = {}
+        critical_stations = {}
+                
         #check if this dictionary came from file where fields are stored as dictionary objects
         if("overflow_programs" in d or "warning_programs" in d or "critical_programs" in d):
             for id, program in d['overflow_programs'].items():
@@ -165,6 +171,33 @@ class WaterTank(ABC):
                     end_datetime = program["end_datetime"],
                     original_enabled = program["original_enabled"]
                 )
+            for id, station in d['overflow_stations'].items():
+                overflow_stations[id] = WaterTankStation(
+                    station_id = id,
+                    run = station["run"],
+                    minutes = station['minutes'],
+                    percentage = station['percentage'],
+                    start_datetime = station["start_datetime"],
+                    end_datetime = station["end_datetime"]
+                )
+            for id, station in d['warning_stations'].items():
+                warning_stations[id] = WaterTankStation(
+                    station_id = id,
+                    run = station["run"],
+                    minutes = station['minutes'],
+                    percentage = station['percentage'],
+                    start_datetime = station["start_datetime"],
+                    end_datetime = station["end_datetime"]
+                )
+            for id, station in d['critical_stations'].items():
+                critical_stations[id] = WaterTankStation(
+                    station_id = id,
+                    run = station["run"],
+                    minutes = station['minutes'],
+                    percentage = station['percentage'],
+                    start_datetime = station["start_datetime"],
+                    end_datetime = station["end_datetime"]
+                )
         else:   #this dictionary came from form submission, fields are like overflow_pr_run_#
             for i in range(0, len(gv.pnames)):
                 overflow_programs[i] = WaterTankProgram(
@@ -190,7 +223,29 @@ class WaterTank(ABC):
                     suspend = ('critical_pr_suspend_' + str(i) in d and str(d['critical_pr_suspend_' + str(i)]) in ["on", "true", "True"]),
                     original_enabled = None if 'critical_original_enabled_pr' + str(i) not in d else d['critical_original_enabled_pr' + str(i)]
                 )
-                
+
+            for i in range(0, len(gv.snames)):
+                overflow_stations[i] = WaterTankStation(
+                    station_id = i,
+                    run = ('overflow_sn_run_' + str(i) in d and str(d['overflow_sn_run_' + str(i)]) in ["on", "true", "True"]),
+                    minutes = None if not d["overflow_sn_minutes_" + str(i)] else int(d["overflow_sn_minutes_" + str(i)]),
+                    percentage = None if not d["overflow_sn_percentage_" + str(i)] else int(d["overflow_sn_percentage_" + str(i)]),
+                )
+
+                warning_stations[i] = WaterTankStation(
+                    station_id = i,
+                    run = ('warning_sn_run_' + str(i) in d and str(d['warning_sn_run_' + str(i)]) in ["on", "true", "True"]),
+                    minutes = None if not d["warning_sn_minutes_" + str(i)] else int(d["warning_sn_minutes_" + str(i)]),
+                    percentage = None if not d["warning_sn_percentage_" + str(i)] else int(d["warning_sn_percentage_" + str(i)]),
+                )
+
+                critical_stations[i] = WaterTankStation(
+                    station_id = i,
+                    run = ('critical_sn_run_' + str(i) in d and str(d['critical_sn_run_' + str(i)]) in ["on", "true", "True"]),
+                    minutes = None if not d["critical_sn_minutes_" + str(i)] else int(d["critical_sn_minutes_" + str(i)]),
+                    percentage = None if not d["critical_sn_percentage_" + str(i)] else int(d["critical_sn_percentage_" + str(i)]),
+                )
+
         self.id = d["id"]
         self.label = d["label"]
         self.sensor_mqtt_topic = d["sensor_mqtt_topic"]
@@ -218,16 +273,15 @@ class WaterTank(ABC):
         self.critical_programs = critical_programs
         self.loss_email = ('loss_email' in d and (str(d["loss_email"]) in ["on", "true", "True"]))
         self.loss_xmpp = ('loss_xmpp' in d and (str(d["loss_xmpp"]) in ["on", "true", "True"]))
+        self.overflow_stations = overflow_stations
+        self.warning_stations = warning_stations
+        self.critical_stations = critical_stations
         self.last_updated = None if 'last_updated' not in d else d["last_updated"]
         self.sensor_measurement = None if 'sensor_measurement' not in d else d["sensor_measurement"]
         self.invalid_sensor_measurement = None if 'invalid_sensor_measurement' not in d else d["invalid_sensor_measurement"]
         self.percentage = None if 'percentage' not in d else float(d["percentage"])
         self.order = None if "order" not in d else int( d["order"])
         self.state = None if "state" not in d or d["state"] is None or d["state"] == "null" else WaterTankState( int(d["state"]) )
-        
-        self.overflow_station = WaterTankStation.FromDict(d)
-        self.warning_station = WaterTankStation.FromDict(d)
-        self.critical_station = WaterTankStation.FromDict(d)
 
     def UpdateSensorMeasurement(self, sensor_id, measurement):
         self.last_updated = datetime.now().replace(microsecond=0)
@@ -313,6 +367,28 @@ class WaterTank(ABC):
         elif(state in [WaterTankState.CRITICAL, WaterTankState.CRITICAL_UNSAFE]):
             stations = self.critical_stations
 
+        station_changed = False
+        station_mask = [0] * gv.sd["nbrd"] # a list of bitmasks, each bitmask representing the 8 stations of a board                        
+        try:
+            for b in range(gv.sd["nbrd"]): # for all boards
+                for s in range(8): # for each station in the board
+                    i = b*8 + s
+                    key_i = str(i)
+                    if(stations[key_i].run and 
+                        stations[key_i].start_datetime is not None and stations[key_i].end_datetime is None ):
+                        print("Stopping running station {}. {}".format(i, gv.snames[i]))
+                        station_mask[b] = station_mask[b] | (1 << s);
+                        stations[key_i].end_datetime = datetime.now().replace(microsecond=0)
+                        if i + 1 == gv.sd["mas"]:
+                            continue  # skip if this is master valve
+                        gv.rs[i][2] = 0         #set duration to 0
+                        gv.rs[i][1] = gv.now    #set stop time now
+                        station_changed = True                                    
+
+            if(station_changed):
+                report_stations_scheduled()
+        except Exception as e:
+            print("Exception in ActivatePrograms state", e)
             
     def RevertPrograms(self, state):
         """
@@ -354,10 +430,51 @@ class WaterTank(ABC):
             report_program_toggle()
         print("RevertPrograms finished")
 
+    def ActivateStations(self, state):
+        """
+        Activate stations.
+        This method should be called when entering one of OVERFLOW, WARNING, CRITICAL states
+        """
+        valid_states = [WaterTankState.OVERFLOW, WaterTankState.WARNING, WaterTankState.CRITICAL]
+        if(state not in valid_states):
+            raise Exception("Invalid state: '{}'. Only states {} allowed in ActivatePrograms".
+                            format(state.name, ", ".join([v.name for v in valid_states])))
+        
+        print("Activating {} stations".format(state.name))
+        sns = self.overflow_stations
+        if(state == WaterTankState.WARNING):
+            sns = self.warning_stations
+        elif(state == WaterTankState.CRITICAL):
+            sns = self.critical_stations
+
+        settings = get_settings()
+        station_changed = False
+        station_mask = [0] * gv.sd["nbrd"] # a list of bitmasks, each bitmask representing the 8 stations of a board                        
+        try:
+            for b in range(gv.sd["nbrd"]): # for all boards
+                for s in range(8): # for each station in the board
+                    i = b*8 + s
+                    key_i = str(i)
+                    if(sns[key_i].run):
+                        print("Running station {}. {}".format(i, gv.snames[i]))
+                        station_mask[b] = station_mask[b] | (1 << s);
+                        sns[key_i].start_datetime = datetime.now().replace(microsecond=0)
+                        sns[key_i].end_datetime = None
+                        if i + 1 == gv.sd["mas"]:
+                            continue  # skip if this is master valve
+                        duration = sns[key_i].minutes*60 if sns[key_i].minutes is not None else settings[MAX_STATION_DURATION]
+                        gv.rs[i][2] = duration
+                        station_changed = True                                    
+
+            if(station_changed):
+                schedule_stations(station_mask)
+        except Exception as e:
+            print("Exception in ActivatePrograms state", e)
+
     def ActivatePrograms(self, state):
         """
-        Enable progams.
-        This method should called when entering one of OVERFLOW, WARNING, CRITICAL states
+        Activate progams.
+        This method should be called when entering one of OVERFLOW, WARNING, CRITICAL states
         """
         valid_states = [WaterTankState.OVERFLOW, WaterTankState.WARNING, WaterTankState.CRITICAL]
         if(state not in valid_states):
@@ -414,9 +531,20 @@ class WaterTank(ABC):
                 return True
         
         return False
+    
+    @staticmethod
+    def CheckAndMarkStationEnd(station, except_same_id_station):
+        print("CheckAndMarkStationEnd gv.srvals:".format(json.dumps(gv.srvals, default=serialize_datetime)))
+        print(gv.srvals)
+            # if(program.start_datetime is not None and program.end_datetime is None):
+            #     print("except_same_id_program:{}, gv.pon:{}, Program ({}) {} was still running, marking it stopped now".format(except_same_id_program, gv.pon, program.id, gv.pnames[int(program.id)]))
+            #     program.end_datetime = datetime.now().replace(microsecond=0)
+            #     return True
+        # TODO: mark end_datetime for stopped stations
+        return False
 
     def RunningProgramChanged(self):
-        print("RunningProgramChanged for state: {}".format(self.state.name))
+        print("RunningProgramChanged for state: {}".format(None if self.state is None else self.state.name))
         programUpdated = False
         print("Doing OVERFLOW programs.")
         for p_id, program in self.overflow_programs.items():
@@ -429,6 +557,21 @@ class WaterTank(ABC):
             programUpdated = self.CheckAndMarkProgramEnd(program, self.state in [WaterTankState.CRITICAL, WaterTankState.CRITICAL_UNSAFE]) or programUpdated
 
         return programUpdated
+    
+    def ZoneChanged(self, station):
+        print("StationCompleted for state: {}".format(None if self.state is None else self.state.name))
+        stationUpdated = False
+        print("Doing OVERFLOW stations.")
+        for station_id, station in self.overflow_stations.items():
+            stationUpdated = self.CheckAndMarkStationEnd(station, self.state in [WaterTankState.OVERFLOW, WaterTankState.OVERFLOW_UNSAFE] ) or stationUpdated
+        print("Doing WARNING stations.")
+        for station_id, station in self.warning_stations.items():
+            stationUpdated = self.CheckAndMarkStationEnd(station, self.state in [WaterTankState.WARNING, WaterTankState.WARNING_UNSAFE]) or stationUpdated
+        print("Doing CRITICAL stations.")
+        for station_id, station in self.critical_stations.items():
+            stationUpdated = self.CheckAndMarkStationEnd(station, self.state in [WaterTankState.CRITICAL, WaterTankState.CRITICAL_UNSAFE]) or stationUpdated
+
+        return stationUpdated
         
     def SignalPercentageChanged(self):
         """
@@ -459,6 +602,7 @@ class WaterTank(ABC):
             (self.state == WaterTankState.WARNING_UNSAFE and new_state != WaterTankState.WARNING)
         ):
             self.RevertPrograms(self.state)
+            self.StopStations(self.state)
 
         #
         # Activate programs for entering new state
@@ -467,6 +611,7 @@ class WaterTank(ABC):
             (new_state == WaterTankState.WARNING and self.state != WaterTankState.WARNING_UNSAFE)
         ):
             self.ActivatePrograms(new_state)
+            self.ActivateStations(new_state)
 
         self.state = new_state
 
@@ -714,7 +859,7 @@ class MessageSender():
         self.percentage_mark = self.water_tank.percentage
 
     def WaterTankPercentageChanged(self, water_tank):
-        print("WaterTankPercentageChanged. water_tank id:{}, state:{}".format(water_tank.id, water_tank.state.name))
+        print("WaterTankPercentageChanged. water_tank id:{}, state:{}".format(water_tank.id, ('None' if water_tank.state is None else water_tank.state.name)))
         if(water_tank.id != self.water_tank.id):
             raise Exception("WaterTankPercentageChanged called on MessageSender initialised with water_tank id:{} but called by water_Tank id: {}".format(self.water_tank.id, water_tank.id))
         
@@ -742,6 +887,18 @@ class MessageSender():
                 email_send_msg( msg, "Water Loss" )
 
 
+### Station Completed ###
+def notify_zone_change(station, **kw):
+    print(u"Zone change signal received")
+    settings = get_settings()
+    for swt_id, swt in settings["water_tanks"].items():
+        wt = WaterTankFactory.FromDict(swt)
+        water_tank_updated = wt.ZoneChanged(station)
+
+complete = signal(u"zone_change")
+complete.connect(notify_zone_change)
+
+
 ### program change ##
 def notify_running_program_change(name, **kw):
     print("Programs changed")
@@ -766,6 +923,7 @@ running_program_change.connect(notify_running_program_change)
 DATA_FILE = u"./data/water_tank.json"
 WATER_PLUGIN_REQUEST_MQTT_TOPIC = u"request_subscribe_mqtt_topic"
 WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC = u"data_publish_mqtt_topic"
+MAX_STATION_DURATION = "max_station_duration"
 XMPP_USERNAME = u"xmpp_username"
 XMPP_PASSWORD = u"xmpp_password"
 XMPP_SERVER = u"xmpp_server"
@@ -795,6 +953,7 @@ _settings = {
     u"mqtt_broker_ws_port": 8080,
     WATER_PLUGIN_REQUEST_MQTT_TOPIC: "WaterTankDataRequest",
     WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC: "WaterTankData",
+    MAX_STATION_DURATION: 60,
     XMPP_USERNAME: "ahat_sip@ahat1.duckdns.org",
     XMPP_PASSWORD: u"312ggp12",
     XMPP_SERVER: u"ahat1.duckdns.org",
@@ -1112,7 +1271,7 @@ def serialize_datetime(obj):
     elif  isinstance(obj, WaterTankProgram):
         return obj.__dict__
     elif  isinstance(obj, WaterTankStation):
-        return #obj.__dict__
+        return obj.__dict__
     elif  isinstance(obj, WaterTank):
         val = obj.__dict__.copy()
         val.pop("state_change_observers")  # do not serialze observer objects
@@ -1475,7 +1634,7 @@ class settings(ProtectedPage):
         if( len(settings[u"water_tanks"]) > 0 ):
             settings[u"water_tanks"] = sorted(list(settings[u"water_tanks"].values()), key= lambda wt : wt["order"])
         # print("Sending settings: {}".format(json.dumps(settings, default=serialize_datetime, indent=4)))
-        return template_render.water_tank(settings, json.dumps(defaults, ensure_ascii=False), gv.pnames, water_tank_id, show_settings)  # open settings page
+        return template_render.water_tank(settings, json.dumps(defaults, ensure_ascii=False), gv.pnames, gv.snames, water_tank_id, show_settings)  # open settings page
 
 
 class save_settings(ProtectedPage):
@@ -1489,11 +1648,12 @@ class save_settings(ProtectedPage):
         d = (
             web.input()
         )  # Dictionary of values returned as query string from settings page.
-        print('Received: {}'.format(json.dumps(d, default=serialize_datetime, indent=4))) # for testing
+        print('Received: {}'.format(json.dumps(d, default=serialize_datetime, indent=4, sort_keys=True))) # for testing
         settings = get_settings()
         settings[u"mqtt_broker_ws_port"] = d[u"mqtt_broker_ws_port"]
         settings[WATER_PLUGIN_REQUEST_MQTT_TOPIC] = d[WATER_PLUGIN_REQUEST_MQTT_TOPIC]
         settings[WATER_PLUGIN_REQUEST_MQTT_TOPIC] = d[WATER_PLUGIN_REQUEST_MQTT_TOPIC]
+        settings[MAX_STATION_DURATION] = int(d[MAX_STATION_DURATION])
         settings[XMPP_USERNAME] = d[XMPP_USERNAME]
         settings[XMPP_PASSWORD] = d[XMPP_PASSWORD]
         settings[XMPP_SERVER] = d[XMPP_SERVER]

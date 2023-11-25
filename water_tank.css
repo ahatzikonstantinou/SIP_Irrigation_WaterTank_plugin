@@ -139,6 +139,7 @@ form.water-tank input{
 /* Classes used for water_tank.html form validation */
 .error {
     border: 2px solid #f00;
+    color: #c00;
 }
 
 .valid {
@@ -269,4 +270,43 @@ form.water-tank input{
     margin: auto;
     width: 27px;
     display: block!important;
+}
+
+.water-tank .station {
+    font-weight: bold;
+    color: #353535;
+    min-width: auto;
+    width: fit-content;
+    margin-bottom: 1em;
+    margin-right: 0.2em;
+}
+
+.water-tank label.station {
+    margin-bottom: 0.5em!important;
+}
+
+.water-tank .station-action {
+    font-size: smaller;
+    font-family: monospace;
+    color: #2E3959;
+}
+
+.water-tank .station input[type=checkbox]{
+    vertical-align: middle;
+    position: relative;
+    margin-left: 0px;
+    margin-right: 0px;
+    margin-bottom: inherit;
+}
+
+.water-tank .station .duration,
+.water-tank .station .percentage {
+    width: 2em;
+    font-size: 1em;
+    margin-right: 0.4em;
+}
+
+.water-tank .station .error {
+    color: #c00;
+    font-weight: normal!important;
 }
