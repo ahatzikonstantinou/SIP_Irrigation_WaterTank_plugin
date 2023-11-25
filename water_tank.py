@@ -533,14 +533,18 @@ class WaterTank(ABC):
         return False
     
     @staticmethod
-    def CheckAndMarkStationEnd(station, except_same_id_station):
-        print("CheckAndMarkStationEnd gv.srvals:".format(json.dumps(gv.srvals, default=serialize_datetime)))
-        print(gv.srvals)
-            # if(program.start_datetime is not None and program.end_datetime is None):
-            #     print("except_same_id_program:{}, gv.pon:{}, Program ({}) {} was still running, marking it stopped now".format(except_same_id_program, gv.pon, program.id, gv.pnames[int(program.id)]))
-            #     program.end_datetime = datetime.now().replace(microsecond=0)
-            #     return True
-        # TODO: mark end_datetime for stopped stations
+    def CheckAndMarkStationEnd(station):
+        # print("CheckAndMarkStationEnd gv.srvals:".format(json.dumps(gv.srvals, default=serialize_datetime)))
+        # print(gv.srvals)
+        #    
+        # mark end_datetime for stopped stations
+        station_index = int(station.station_id)
+        if( gv.srvals[station_index] == 0 and station.run and 
+           station.start_datetime is not None and station.end_datetime is None):
+            print("Marking ended station {}. {}".format(station_index, gv.snames[station_index]))
+            station.end_datetime = datetime.now().replace(microsecond=0)
+            return True
+        
         return False
 
     def RunningProgramChanged(self):
@@ -558,18 +562,18 @@ class WaterTank(ABC):
 
         return programUpdated
     
-    def ZoneChanged(self, station):
+    def ZoneChanged(self):
         print("StationCompleted for state: {}".format(None if self.state is None else self.state.name))
         stationUpdated = False
         print("Doing OVERFLOW stations.")
         for station_id, station in self.overflow_stations.items():
-            stationUpdated = self.CheckAndMarkStationEnd(station, self.state in [WaterTankState.OVERFLOW, WaterTankState.OVERFLOW_UNSAFE] ) or stationUpdated
+            stationUpdated = self.CheckAndMarkStationEnd(station) or stationUpdated
         print("Doing WARNING stations.")
         for station_id, station in self.warning_stations.items():
-            stationUpdated = self.CheckAndMarkStationEnd(station, self.state in [WaterTankState.WARNING, WaterTankState.WARNING_UNSAFE]) or stationUpdated
+            stationUpdated = self.CheckAndMarkStationEnd(station) or stationUpdated
         print("Doing CRITICAL stations.")
         for station_id, station in self.critical_stations.items():
-            stationUpdated = self.CheckAndMarkStationEnd(station, self.state in [WaterTankState.CRITICAL, WaterTankState.CRITICAL_UNSAFE]) or stationUpdated
+            stationUpdated = self.CheckAndMarkStationEnd(station) or stationUpdated
 
         return stationUpdated
         
@@ -601,8 +605,9 @@ class WaterTank(ABC):
             (self.state == WaterTankState.WARNING and new_state != WaterTankState.WARNING_UNSAFE) or
             (self.state == WaterTankState.WARNING_UNSAFE and new_state != WaterTankState.WARNING)
         ):
-            self.RevertPrograms(self.state)
-            self.StopStations(self.state)
+            if(self.enabled):
+                self.RevertPrograms(self.state)
+                self.StopStations(self.state)
 
         #
         # Activate programs for entering new state
@@ -610,8 +615,9 @@ class WaterTank(ABC):
             (new_state == WaterTankState.CRITICAL and self.state != WaterTankState.CRITICAL_UNSAFE) or
             (new_state == WaterTankState.WARNING and self.state != WaterTankState.WARNING_UNSAFE)
         ):
-            self.ActivatePrograms(new_state)
-            self.ActivateStations(new_state)
+            if(self.enabled):            
+                self.ActivatePrograms(new_state)
+                self.ActivateStations(new_state)
 
         self.state = new_state
 
@@ -888,12 +894,12 @@ class MessageSender():
 
 
 ### Station Completed ###
-def notify_zone_change(station, **kw):
+def notify_zone_change(name, **kw):
     print(u"Zone change signal received")
     settings = get_settings()
     for swt_id, swt in settings["water_tanks"].items():
         wt = WaterTankFactory.FromDict(swt)
-        water_tank_updated = wt.ZoneChanged(station)
+        water_tank_updated = wt.ZoneChanged()
 
 complete = signal(u"zone_change")
 complete.connect(notify_zone_change)
