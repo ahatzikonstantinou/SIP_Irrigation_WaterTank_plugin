@@ -341,3 +341,12 @@ form.water-tank input{
     color: #c00;
     font-weight: normal!important;
 }
+
+#sensor-log label {
+    border: none;
+    padding: 0px;
+}
+
+#sensor-log p {
+    text-align: left;
+}
