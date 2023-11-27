@@ -101,7 +101,7 @@ function getWaterTankStateName(stateValue)
         });
 
         jQuery("button#docButton").click(function(){
-            window.open("static/docs/plugins/proto-docs.html", "_blank");
+            window.open("static/docs/plugins/water-tank-plugin-docs.html", "_blank");
         });
 
         // console.log('Getting all water tank data');
@@ -636,16 +636,17 @@ function getWaterTankStateName(stateValue)
                 </fieldset>
                 <hr>
                 <h3>$_('Sensors')</h3>
-                <p class="info">$_('If a sensor has not sent a signal within the specified "no signal" minutes, SIP will flash the time-passed since last update under the water tank\'s name in the hompegage. SIP will keep only the newset max sensor log records in the sensors log.')</p>
+                <p class="info">$_('If a sensor has not sent a signal within the specified "no signal" minutes, SIP will flash the time-passed since last update under the water tank\'s name in the hompegage.')</p> 
+                <p class="info">$_('SIP will keep only the newest max sensor log records in the sensors log.')</p>
                 <fieldset class="two-col">
                     <label>$_('Max Sensor No Signal (mins)'):</label><input type="number" id="max_sensor_no_signal_mins" name="max_sensor_no_signal_mins" min="0" value="$settings['max_sensor_no_signal_mins']" required/>
                     <label>$_('Max Sensor Log Records'):</label><input type="number" id="max_sensor_log_records" name="max_sensor_log_records" min="0" value="$settings['max_sensor_log_records']" required/>
-                    <label>$_('Enable Sensor Logging')<input id="sensor_log_enabled" name="sensor_log_enabled" type="checkbox" ${'checked=checked' if settings['sensor_log_enabled'] else ''}/></label>
+                    <label>$_('Enable Sensor Logging')</label><input id="sensor_log_enabled" name="sensor_log_enabled" type="checkbox" ${'checked=checked' if settings['sensor_log_enabled'] else ''}/>
                 </fieldset>
-                <button id="sensorLog" class="log" title=$:{json.dumps(_('View Log'), ensure_ascii=False)}>$_('Log')</button>
+                <button id="sensorLog" class="log" title=$:{json.dumps(_('View Log'), ensure_ascii=False)}>$_('View Log')</button>
                 <hr>
                 <h3>MQTT</h3>
-                <p class="info">$_('SIP will listen for incomming messages in the Subscribe topic. As soon as message arrives, SIP will publish all water tank data to the Publish topic. The broker ws port is required for the Paho javascript library, please note that for a broker like mosquitto this is a different listener port than the standard 1883.')</p>
+                <p class="info">$_('SIP will listen for incomming messages in the Subscribe topic. As soon as a message arrives, SIP will publish all water tank data to the Publish topic. The broker ws port is required for the Paho javascript library, please note that for a broker like mosquitto this is a different listener port than the standard 1883.')</p>
                 <fieldset class="two-col">
                     <label>$_('Broker WS Port'):</label><input type="number" id="mqtt_broker_ws_port" name="mqtt_broker_ws_port" value="$settings['mqtt_broker_ws_port']"/>
                     <label>$_('Data-Request Subscribe Topic'):</label><input type="text" id="request_subscribe_mqtt_topic" name="request_subscribe_mqtt_topic" value="$settings['request_subscribe_mqtt_topic']"/>
@@ -675,7 +676,10 @@ function getWaterTankStateName(stateValue)
 
                 <hr>
                 <h3>Messages</h3>
-                <p class="info">$_('SIP will send messages (email and/or XMPP) for unassociated senson messages, invalid-sensor-measurement, overflow, warning, critical, and water-loss events. For overflow, warning, and critical events messages will be resent only after the water level has crossed back over the event level. The list of allowed keywords that will be replaced by the corresponding values is: {water_tank_id}, {water_tank_label}, {sensor_id}, {percentage}, {measurement}, {last_updated}, {mqtt_topic}, {additional_info}. Keywords must be enclosed in curly brackets. Keywords {water_tank_id},{water_tank_label},{percentage},{additional_info} are not valid for field "Unassociated-Sensor" message. For field Unrecognised message valid are only keywords {mqtt_topic}, {date}, and {message}')</p>
+                <p class="info">$_('SIP will send messages (email and/or XMPP) for unassociated senson messages, invalid-sensor-measurement, overflow, warning, critical, and water-loss events.')</p>
+                <p class="info">$_('For overflow, warning, and critical events messages will be resent only after the water level has crossed back over the event level. The list of allowed keywords that will be replaced by the corresponding values is: {water_tank_id}, {water_tank_label}, {sensor_id}, {percentage}, {measurement}, {last_updated}, {mqtt_topic}, {additional_info}. Keywords must be enclosed in curly brackets.')</p>
+                <p class="info">$_('Keywords {water_tank_id},{water_tank_label},{percentage},{additional_info} are not valid for field "Unassociated-Sensor" message.')</p>
+                <p class="info">$_('For field Unrecognised message valid are only keywords {mqtt_topic}, {date}, and {message}')</p>
                 <fieldset class="two-col">
                     <div>
                         <label>$_('Unrecognised message'):</label>
@@ -826,8 +830,15 @@ function getWaterTankStateName(stateValue)
             </div>
         </fieldset>
 
+        <h4>$_('Water Tank States')</h4>
+
+        <p class="info">$_('Specify water levels (% of total water tank volume) at which the water tank enters OVERFLOW, WARNING, and CRITICAL state.')</p>
+        <p class="info">$_('Specify a corresponding SAFETY level that must be crossed in order to consider the state as exited.')</p>
+        <p class="info">$_('Specify programs to run, be enabled, suspended when entering a state. The program status will be reverted upon exiting the state.')</p>
+        <p class="info">$_('Specify stations that will run for a specific amount of time, or until a certain percentage is crossed, or until the state is exited.')</p>
+        <p class="info">$_('Specify which emails and xmpp accounts to notify when entering a state.')</p>
+
         <div><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Overflow')</h4><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span></div>
-        <p class="info">$_('Define at what % level an overflow occurs, which programs will run, the safe level % until which they will run, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">            
             <label>$_('Overflow Level'):</label><div><input id="overflow_level" name="overflow_level" type=number min=0 max=100/></div>
             <label>$_('Safe level'):</label><div><input id="overflow_safe_level" name="overflow_safe_level" type=number min=0 max=100/></div>
@@ -867,7 +878,6 @@ function getWaterTankStateName(stateValue)
         </fieldset>
 
         <div><span name="warning_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Warning')</h4><span name="warning_flash" class="flash-event" hidden>&#x26A1;</span></div>
-        <p class="info">$_('Define at what % level a warning occurs, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">
             <label>$_('Level'):</label><div><input id="warning_level" name="warning_level" type=number min=0 max=100/></div>
             <label>$_('Safe level'):</label><div><input id="warning_safe_level" name="warning_safe_level" type=number min=0 max=100/></div>
@@ -907,7 +917,6 @@ function getWaterTankStateName(stateValue)
         </fieldset>
 
         <div><span name="critical_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Critical')</h4><span name="critical_flash" class="flash-event" hidden>&#x26A1;</span></div>
-        <p class="info">$_('Define which % level is critical, which programs will be suspended and which will be activated, which emails and xmpp accounts to notify.')</p>
         <fieldset class="two-col">
             <label>$_('Level'):</label><div><input id="critical_level" name="critical_level" type=number min=0 max=100/></div>
             <label>$_('Safe level'):</label><div><input id="critical_safe_level" name="critical_safe_level" type=number min=0 max=100/></div>
