@@ -45,6 +45,17 @@ function getWaterTankStateName(stateValue)
     jQuery(document).ready(function(){
 
         jQuery("details").prop("open", ${"true" if show_settings else "false" });
+
+        // add click event explicitly to stop form submit
+        let form = document.querySelector('#pluginFormSettings');
+        form.addEventListener('submit', function () {
+            // Ignore the #sensorLog button
+            if (event.submitter.matches('#sensorLog')) {
+                event.preventDefault();
+                window.location = "/water_plugin_sensor_log"; 
+            }
+        });
+
         jQuery("#cUpdateSettings").click(function() {
             jQuery("#pluginFormSettings").valid();
             // jQuery("#pluginFormSettings").submit();
@@ -613,6 +624,15 @@ function getWaterTankStateName(stateValue)
                 <fieldset class="two-col">
                     <label>$_('Max Station Duration (mins)'):</label><input type="number" id="max_station_duration" name="max_station_duration" min="0" value="$settings['max_station_duration']" required/>
                 </fieldset>
+                <hr>
+                <h3>$_('Sensors')</h3>
+                <p class="info">$_('If a sensor has not sent a signal within the specified "no signal" minutes, SIP will flash the time-passed since last update under the water tank\'s name in the hompegage. SIP will keep only the newset max sensor log records in the sensors log.')</p>
+                <fieldset class="two-col">
+                    <label>$_('Max Sensor No Signal (mins)'):</label><input type="number" id="max_sensor_no_signal_mins" name="max_sensor_no_signal_mins" min="0" value="$settings['max_sensor_no_signal_mins']" required/>
+                    <label>$_('Max Sensor Log Records'):</label><input type="number" id="max_sensor_log_records" name="max_sensor_log_records" min="0" value="$settings['max_sensor_log_records']" required/>
+                    <label>$_('Enable Sensor Logging')<input id="sensor_log_enabled" name="sensor_log_enabled" type="checkbox" ${'checked=checked' if settings['sensor_log_enabled'] else ''}/></label>
+                </fieldset>
+                <button id="sensorLog" class="log" title=$:{json.dumps(_('View Log'), ensure_ascii=False)}>$_('Log')</button>
                 <hr>
                 <h3>MQTT</h3>
                 <p class="info">$_('SIP will listen for incomming messages in the Subscribe topic. As soon as message arrives, SIP will publish all water tank data to the Publish topic. The broker ws port is required for the Paho javascript library, please note that for a broker like mosquitto this is a different listener port than the standard 1883.')</p>

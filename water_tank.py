@@ -14,6 +14,9 @@ import xmpp
 import smtplib
 from email.mime.text import MIMEText
 import traceback # for exception debugging
+import ast      # for logging
+import io       # for logging
+import codecs   # for logging
 
 # local module imports
 from blinker import signal
@@ -927,9 +930,13 @@ running_program_change.connect(notify_running_program_change)
 
 
 DATA_FILE = u"./data/water_tank.json"
+LOG_FILE = u"./data/water_tank.sensor_log.json"
 WATER_PLUGIN_REQUEST_MQTT_TOPIC = u"request_subscribe_mqtt_topic"
 WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC = u"data_publish_mqtt_topic"
 MAX_STATION_DURATION = "max_station_duration"
+MAX_SENSOR_NO_SIGNAL_MINS = "max_sensor_no_signal_mins"
+MAX_SENSOR_LOG_RECORDS = "max_sensor_log_records"
+SENSOR_LOG_ENABLED = "sensor_log_enabled"
 XMPP_USERNAME = u"xmpp_username"
 XMPP_PASSWORD = u"xmpp_password"
 XMPP_SERVER = u"xmpp_server"
@@ -960,6 +967,9 @@ _settings = {
     WATER_PLUGIN_REQUEST_MQTT_TOPIC: "WaterTankDataRequest",
     WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC: "WaterTankData",
     MAX_STATION_DURATION: 60,
+    MAX_SENSOR_NO_SIGNAL_MINS: 10,
+    MAX_SENSOR_LOG_RECORDS: 1000,
+    SENSOR_LOG_ENABLED: True,
     XMPP_USERNAME: "ahat_sip@ahat1.duckdns.org",
     XMPP_PASSWORD: u"312ggp12",
     XMPP_SERVER: u"ahat1.duckdns.org",
@@ -1255,9 +1265,13 @@ urls.extend([
     u"/water-tank-save-water-tanks", u"plugins.water_tank.save_water_tanks",
     u"/water-tank-get-all", u"plugins.water_tank.get_all",
     u"/water-tank-get_mqtt_settings", u"plugins.water_tank.get_mqtt_settings",
+    u"/water_tank_get_settings_json", u"plugins.water_tank.get_settings_json",
     u"/water-tank-delete", u"plugins.water_tank.delete",
     u"/water-tank-save-order", u"plugins.water_tank.save_order",
-    u"/water-tank-revert-programs", u"plugins.water_tank.revert_programs"
+    u"/water-tank-revert-programs", u"plugins.water_tank.revert_programs",
+    u"/water_plugin_sensor_log", u"plugins.water_tank.sensor_log",
+    u"/water_plugin_clear_sensor_log", u"plugins.water_tank.clear_sensor_log",
+    u"/water_plugin_download_sensor_log", u"plugins.water_tank.csv_sensor_log"
     ])
 # fmt: on
 
@@ -1513,11 +1527,55 @@ def updateSensorMeasurementFromCmd(cmd, water_tanks, msg):
     return water_tank_updated
 
 
+def read_sensor_log():
+    """
+    Read data from sensor log file.
+    """
+    result = []
+    try:
+        with io.open(LOG_FILE) as logf:
+            records = logf.readlines()
+            for i in records:
+                try:
+                    rec = ast.literal_eval(json.loads(i))
+                except ValueError:
+                    rec = json.loads(i)
+                result.append(rec)
+        return result
+    except IOError:
+        return result
+
+
+def log_sensor_msg(msg):
+    settings = get_settings()
+
+    logline = (
+        '{' +
+        '"date":"' + datetime.now().isoformat(sep=' ', timespec='seconds') + '",' +
+        '"mqtt_topic":"' + str(msg.topic) + '",' +
+        '"mqtt_payload":' + json.dumps(str(msg.payload)) +
+        '}'
+    )
+    lines = []
+    lines.append(logline + "\n")
+    log = read_sensor_log()
+    for r in log:
+        lines.append(json.dumps(r) + "\n")
+    with codecs.open(LOG_FILE, "w", encoding="utf-8") as f:
+        if settings[MAX_SENSOR_LOG_RECORDS]:
+            f.writelines(lines[: settings[MAX_SENSOR_LOG_RECORDS]])
+        else:
+            f.writelines(lines) 
+
+
 def on_sensor_mqtt_message(client, msg):
     """
     Callback when MQTT message is received from sensor
     """
     print('Received MQTT message: {}'.format(msg.payload))
+    settings = get_settings()
+    if settings[SENSOR_LOG_ENABLED]:
+        log_sensor_msg(msg)
     try:
         cmd = json.loads(msg.payload)
         print('MQTT cmd: {}'.format(cmd))
@@ -1527,7 +1585,6 @@ def on_sensor_mqtt_message(client, msg):
         return
 
     try:
-        settings = get_settings()
         water_tanks = settings[u"water_tanks"]
         water_tank_updated = False
         # print("Before updateSensorMeasurementFromCmd water_tanks: {}".format(json.dumps(settings[u"water_tanks"], default=serialize_datetime, indent=4)))
@@ -1659,6 +1716,9 @@ class save_settings(ProtectedPage):
         settings[u"mqtt_broker_ws_port"] = d[u"mqtt_broker_ws_port"]
         settings[WATER_PLUGIN_REQUEST_MQTT_TOPIC] = d[WATER_PLUGIN_REQUEST_MQTT_TOPIC]
         settings[WATER_PLUGIN_REQUEST_MQTT_TOPIC] = d[WATER_PLUGIN_REQUEST_MQTT_TOPIC]
+        settings[MAX_SENSOR_NO_SIGNAL_MINS] = int(d[MAX_SENSOR_NO_SIGNAL_MINS])
+        settings[MAX_SENSOR_LOG_RECORDS] = int(d[MAX_SENSOR_LOG_RECORDS])
+        settings[SENSOR_LOG_ENABLED] = (SENSOR_LOG_ENABLED in d)
         settings[MAX_STATION_DURATION] = int(d[MAX_STATION_DURATION])
         settings[XMPP_USERNAME] = d[XMPP_USERNAME]
         settings[XMPP_PASSWORD] = d[XMPP_PASSWORD]
@@ -1782,6 +1842,14 @@ class get_mqtt_settings(ProtectedPage):
         return json.dumps(settings, default=serialize_datetime, indent=4)
 
 
+class get_settings_json(ProtectedPage):
+    """
+    Return the water_tank settings.
+    """
+    def GET(self):
+        return json.dumps(get_settings(), default=serialize_datetime, indent=4)
+
+
 class delete(ProtectedPage)    :
     """
     Deletes a water tank record from settings based on water tank id
@@ -1850,6 +1918,41 @@ class revert_programs(ProtectedPage):
         except Exception as e:
             return '{"success": false, "reason": "An exception occured: ' + e + '"}'
 
+
+class sensor_log(ProtectedPage):
+    def GET(self):
+        records = read_sensor_log()
+        return template_render.water_tank_log(records, get_settings())
+
+
+class clear_sensor_log(ProtectedPage):
+    """Delete all log records"""
+
+    def GET(self):
+        with io.open(LOG_FILE, "w") as f:
+            f.write("")
+        raise web.seeother("/water_plugin_sensor_log")
+
+
+class csv_sensor_log(ProtectedPage):
+    """Simple Log API"""
+
+    def GET(self):
+        records = read_sensor_log()
+        data = _("Date, MQTT Topic, MQTT Payload") + "\n"
+        for r in records:
+            event = ast.literal_eval(json.dumps(r))
+            data += (
+                event["date"]
+                + ", "
+                + event["mqtt_topic"]
+                + ", "
+                + event["mqtt_payload"]
+                + "\n"
+            )
+
+        web.header("Content-Type", "text/csv")
+        return data
 
 #  Run when plugin is loaded
 detect_water_tank_js() # add water_tank.js to base.html if ncessary

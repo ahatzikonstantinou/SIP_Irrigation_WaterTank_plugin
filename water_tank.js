@@ -2,12 +2,36 @@ $(document).ready(function() {
   //
   // get all water tank info for initial setup
 
+  function get_whole_values(base_value, time_fractions) {
+    time_data = [base_value];
+    for (i = 0; i < time_fractions.length; i++) {
+        time_data.push(parseInt(time_data[i]/time_fractions[i]));
+        time_data[i] = time_data[i] % time_fractions[i];
+    }; return time_data;
+  };
+
   function template(water_tank, state="" )
   {
     // console.log(`Will generate tr for id: ${water_tank.id}, label: ${water_tank.label}, percentage: ${water_tank.percentage}, sensor_error: ${water_tank.invalid_sensor_measurement}, last_updated: ${water_tank.last_updated}, state: "${state}"`);
     let str_percentage = "";
     let width_percentage = 0;
     let last_updated = water_tank.last_updated;
+    // console.log("date last update:", last_updated);
+    
+    const time_passed = get_whole_values(Date.now() - new Date(water_tank.last_updated), [1000,  60, 60, 24]);
+    // console.log("time_passed: ", time_passed);
+    let time_passed_str = "";
+    if(time_passed[4]>0)
+    {
+      time_passed_str = time_passed[4] + "d ";
+    }
+    if(time_passed[3]>0)
+    {
+      time_passed_str += new String(time_passed[3]).padStart(2,0) + "h ";
+    }
+    time_passed_str += (new String(time_passed[2]).padStart(2,0)) + "m ago";
+    // console.log(time_passed_str);
+
     if(last_updated == null)
     {
       last_updated = "";
@@ -24,11 +48,37 @@ $(document).ready(function() {
     }
     let hidden = !water_tank.enabled ? "hidden" : "";
     // console.log(`Water_tank_id:${water_tank.id}, enabled: ${water_tank.enabled}, hidden:${hidden}`);
+    var water_tank_settings = null;
 
+    // I need to synchronously fetch the water_tank plugin settings to get the max_station_no_signal_mins
+    // since jQuery.getJson uses ajax configuration  just set the global ajax configs
+    // from https://stackoverflow.com/a/23057124
+    $.ajaxSetup({
+      async: false
+    });
+    
+    // Your $.getJSON() request is now synchronous...
+    $.getJSON('water_tank_get_settings_json', function(data)
+    {
+      water_tank_settings = data;
+      // console.log("water_tank_settings: ", water_tank_settings);
+    });
+    
+    // Set the global configs back to asynchronous 
+    $.ajaxSetup({
+        async: true
+    });
+    
+    // console.log("water_tank_settings: ", water_tank_settings);
+    // console.log("Time passed millis: " + (Date.now() - new Date(water_tank.last_updated)));
+    // console.log("max_sensor_no_signal_mins in millis: " + water_tank_settings.max_sensor_no_signal_mins);
+    const exceeded = (Date.now() - new Date(water_tank.last_updated)) > water_tank_settings.max_sensor_no_signal_mins*60000 ? "exceeded" : "";
+    // console.log( "exceeded: " + exceeded);
     return `<tr id="${water_tank.id}" ${hidden}>
       <td style="white-space: nowrap;">
         <div class="water-tank-label">${water_tank.label}</div>
-        <div class="last_updated">${last_updated}</div></td>
+        <div class="last_updated ${exceeded}">${time_passed_str}</div>
+      </td>
       <td style="width:100%">
         <div style="width: 100%;
         height: 2em;
