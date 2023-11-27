@@ -66,6 +66,16 @@ function getWaterTankStateName(stateValue)
             jQuery("#pluginFormWaterTanks").submit();
         });
 
+
+        // uncomment for debugging only, stops form submit to be able to see validation errors
+        // document.querySelector('#pluginFormWaterTanks').addEventListener('submit', function () {
+        //     // Ignore the #sensorLog button
+        //     if (event.submitter.matches('#cUpdate')) {
+        //         event.preventDefault();
+        //     }
+        // });
+
+
         jQuery("#cUpdate").click(function() {
             if(jQuery("#original_water_tank_id").val().trim().length === 0)
             {
@@ -79,9 +89,6 @@ function getWaterTankStateName(stateValue)
             }
 
             jQuery("#pluginFormWaterTanks").valid();
-
-            // jQuery("#action").val("update");            
-            // jQuery("#pluginFormWaterTanks").submit();
         });
 
         jQuery("button#cDelete").click(function(){
@@ -310,7 +317,7 @@ function getWaterTankStateName(stateValue)
         
         jQuery.validator.addMethod("greaterThan", function (value, element, param) {
             let otherElement = jQuery(param);
-            if(otherElement.val().trim().length == 0 && element.val().trim().length == 0)
+            if(otherElement.val().trim().length == 0 || jQuery(element).val().trim().length == 0)
             {
                 return true;
             }
@@ -319,7 +326,7 @@ function getWaterTankStateName(stateValue)
         
         jQuery.validator.addMethod("lessThan", function (value, element, param) {
             let otherElement = jQuery(param);
-            if(otherElement.val().trim().length == 0 && element.val().trim().length == 0)
+            if(otherElement.val().trim().length == 0 || jQuery(element).val().trim().length == 0)
             {
                 return true;
             }
@@ -334,7 +341,7 @@ function getWaterTankStateName(stateValue)
             time = jQuery(element).closest("div[class=station").find("input[type=number]").first().val();
             //percentage = jQuery(element).closest("div[class=station").find("input[type=number]").last().val();
 
-            return time.length > 0; // || percentage.length > 0;
+            return time.trim().length > 0; // || percentage.length > 0;
             },
             "Specify Time"
         );
@@ -366,7 +373,7 @@ function getWaterTankStateName(stateValue)
                     pattern: 'Only letters, numbers, and underscores are allowed'
                 },
                 overflow_safe_level: {
-                    lessThan: "Overflow safe level must be less than than overflow level"
+                    lessThan: "Overflow safe level must be less than overflow level"
                 },
                 warning_safe_level: {
                     greaterThan: "Warning safe level must be greater than warning level"
@@ -484,12 +491,15 @@ function getWaterTankStateName(stateValue)
             jQuery("#overflow_sn_run_$i").prop('checked', water_tank.overflow_stations["$i"].run);
             jQuery("#overflow_sn_minutes_$i").val(water_tank.overflow_stations["$i"].minutes);
             jQuery("#overflow_sn_percentage_$i").val(water_tank.overflow_stations["$i"].percentage);
+            jQuery("#overflow_sn_stop_on_exit_$i").prop('checked', water_tank.overflow_stations["$i"].stop_on_exit);
             jQuery("#warning_sn_run_$i").prop('checked', water_tank.warning_stations["$i"].run);
             jQuery("#warning_sn_minutes_$i").val(water_tank.warning_stations["$i"].minutes);
             jQuery("#warning_sn_percentage_$i").val(water_tank.warning_stations["$i"].percentage);
+            jQuery("#warning_sn_stop_on_exit_$i").prop('checked', water_tank.warning_stations["$i"].stop_on_exit);
             jQuery("#critical_sn_run_$i").prop('checked', water_tank.critical_stations["$i"].run);
             jQuery("#critical_sn_minutes_$i").val(water_tank.critical_stations["$i"].minutes);
             jQuery("#critical_sn_percentage_$i").val(water_tank.critical_stations["$i"].percentage);
+            jQuery("#critical_sn_stop_on_exit_$i").prop('checked', water_tank.critical_stations["$i"].stop_on_exit);
 
         jQuery("#loss_email").prop('checked', water_tank.loss_email);
         jQuery("#loss_xmpp").prop('checked', water_tank.loss_xmpp);
@@ -848,8 +858,10 @@ function getWaterTankStateName(stateValue)
                         $snames[i]
                     </label>
                     <label class="station-action">
-                        <input class="duration" id="overflow_sn_minutes_$i" name="overflow_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
-                    <label class="station-action"><input class="percentage" id="overflow_sn_percentage_$i" name="overflow_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>       
+                        <input class="duration" id="overflow_sn_minutes_$i" name="overflow_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')
+                    </label>
+                    <label class="station-action"><input class="percentage" id="overflow_sn_percentage_$i" name="overflow_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>
+                    <label class="station-action"><input class="stop" id="overflow_sn_stop_on_exit_$i" name="overflow_sn_stop_on_exit_$i" type="checkbox"/>$_('Event Stop')</label>
                 </div>             
             </div>     
         </fieldset>
@@ -887,7 +899,9 @@ function getWaterTankStateName(stateValue)
                     </label>
                     <label class="station-action">
                         <input class="duration" id="warning_sn_minutes_$i" name="warning_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
-                    <label class="station-action"><input class="percentage" id="warning_sn_percentage_$i" name="warning_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>       
+                    <label class="station-action"><input class="percentage" id="warning_sn_percentage_$i" name="warning_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>   
+                    <label class="station-action"><input class="stop" id="warning_sn_stop_on_exit_$i" name="warning_sn_stop_on_exit_$i" type="checkbox"/>$_('Event Stop')</label>
+
                 </div>             
             </div> 
         </fieldset>
@@ -925,7 +939,8 @@ function getWaterTankStateName(stateValue)
                     </label>
                     <label class="station-action">
                         <input class="duration" id="critical_sn_minutes_$i" name="critical_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
-                    <label class="station-action"><input class="percentage" id="critical_sn_percentage_$i" name="critical_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>       
+                    <label class="station-action"><input class="percentage" id="critical_sn_percentage_$i" name="critical_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>  
+                    <label class="station-action"><input class="stop" id="critical_sn_stop_on_exit_$i" name="critical_sn_stop_on_exit_$i" type="checkbox"/>$_('Event Stop')</label>
                 </div>             
             </div>          
         </fieldset>

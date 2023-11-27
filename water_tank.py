@@ -69,22 +69,15 @@ class WaterTankStation():
     This is a station that will run when the water tank enters a state
     for a certain amount of time or until a certain percentage is reached
     """
-    def __init__(self, station_id, run, minutes, percentage, start_datetime = None, end_datetime = None):
+    def __init__(self, station_id, run, minutes, percentage, stop_on_exit, start_datetime = None, end_datetime = None):
         self.station_id = station_id
         self.run = run
         self.minutes = minutes
         self.percentage = percentage
+        self.stop_on_exit = stop_on_exit
         self.start_datetime = start_datetime
         self.end_datetime = end_datetime
 
-    # def FromDict(d):
-    #     station_id = None if "station_id" not in d else int(d["station_id"])
-    #     run = None if "hours" not in d else int(d["hours"])
-    #     minutes = None if "minutes" not in d else int(d["minutes"])
-    #     percentage = None if "percentage" not in d else float(d["percentage"])
-
-    #     return WaterTankStation(station_id, hours, minutes, percentage)
-        
 
 class WaterTank(ABC):
     def __init__(self, id, label, type, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp, overflow_stations = None, warning_stations = None, critical_stations = None):
@@ -180,6 +173,7 @@ class WaterTank(ABC):
                     run = station["run"],
                     minutes = station['minutes'],
                     percentage = station['percentage'],
+                    stop_on_exit = station['stop_on_exit'],
                     start_datetime = station["start_datetime"],
                     end_datetime = station["end_datetime"]
                 )
@@ -189,6 +183,7 @@ class WaterTank(ABC):
                     run = station["run"],
                     minutes = station['minutes'],
                     percentage = station['percentage'],
+                    stop_on_exit = station['stop_on_exit'],
                     start_datetime = station["start_datetime"],
                     end_datetime = station["end_datetime"]
                 )
@@ -198,6 +193,7 @@ class WaterTank(ABC):
                     run = station["run"],
                     minutes = station['minutes'],
                     percentage = station['percentage'],
+                    stop_on_exit = station['stop_on_exit'],
                     start_datetime = station["start_datetime"],
                     end_datetime = station["end_datetime"]
                 )
@@ -233,6 +229,7 @@ class WaterTank(ABC):
                     run = ('overflow_sn_run_' + str(i) in d and str(d['overflow_sn_run_' + str(i)]) in ["on", "true", "True"]),
                     minutes = None if not d["overflow_sn_minutes_" + str(i)] else int(d["overflow_sn_minutes_" + str(i)]),
                     percentage = None if not d["overflow_sn_percentage_" + str(i)] else int(d["overflow_sn_percentage_" + str(i)]),
+                    stop_on_exit = ('overflow_sn_stop_on_exit_' + str(i) in d and str(d['overflow_sn_stop_on_exit_' + str(i)]) in ["on", "true", "True"]),
                 )
 
                 warning_stations[i] = WaterTankStation(
@@ -240,6 +237,7 @@ class WaterTank(ABC):
                     run = ('warning_sn_run_' + str(i) in d and str(d['warning_sn_run_' + str(i)]) in ["on", "true", "True"]),
                     minutes = None if not d["warning_sn_minutes_" + str(i)] else int(d["warning_sn_minutes_" + str(i)]),
                     percentage = None if not d["warning_sn_percentage_" + str(i)] else int(d["warning_sn_percentage_" + str(i)]),
+                    stop_on_exit = ('warning_sn_stop_on_exit_' + str(i) in d and str(d['warning_sn_stop_on_exit_' + str(i)]) in ["on", "true", "True"]),
                 )
 
                 critical_stations[i] = WaterTankStation(
@@ -247,6 +245,7 @@ class WaterTank(ABC):
                     run = ('critical_sn_run_' + str(i) in d and str(d['critical_sn_run_' + str(i)]) in ["on", "true", "True"]),
                     minutes = None if not d["critical_sn_minutes_" + str(i)] else int(d["critical_sn_minutes_" + str(i)]),
                     percentage = None if not d["critical_sn_percentage_" + str(i)] else int(d["critical_sn_percentage_" + str(i)]),
+                    stop_on_exit = ('critical_sn_stop_on_exit_' + str(i) in d and str(d['critical_sn_stop_on_exit_' + str(i)]) in ["on", "true", "True"]),
                 )
 
         self.id = d["id"]
@@ -286,18 +285,37 @@ class WaterTank(ABC):
         self.order = None if "order" not in d else int( d["order"])
         self.state = None if "state" not in d or d["state"] is None or d["state"] == "null" else WaterTankState( int(d["state"]) )
 
+    def MeasurementIsValid(self, measurement):
+        if( (self.min_valid_sensor_measurement is not None and measurement < self.min_valid_sensor_measurement) or 
+            (self.max_valid_sensor_measurement is not None and measurement > self.max_valid_sensor_measurement) or
+            (self.GetHeight() < (measurement - self.sensor_offset_from_top)) or
+            (measurement < 0)
+        ):
+            return False
+         
+        return True
+    
     def UpdateSensorMeasurement(self, sensor_id, measurement):
         self.last_updated = datetime.now().replace(microsecond=0)
         self.sensor_measurement = measurement
-        if( (self.min_valid_sensor_measurement is not None and measurement < self.min_valid_sensor_measurement) or 
-           (self.max_valid_sensor_measurement is not None and measurement > self.max_valid_sensor_measurement) or
-           (self.GetHeight() < (measurement - self.sensor_offset_from_top)) ):
+        if( not self.MeasurementIsValid(measurement) ):
             self.invalid_sensor_measurement = True
             self.percentage = None
             send_invalid_measurement_msg(self, self.AdditionalInfo4Msg())
             return False
 
+        percentageBefore = self.percentage
         self.invalid_sensor_measurement = False
+        percentage = self.CalculatePercentage(measurement)
+        if percentage is None:
+            self.invalid_sensor_measurement = True
+            self.percentage = None
+            return False
+        
+        self.percentage = percentage
+        self.StopStationsOnPercentageChange(percentageBefore)
+        self.SignalPercentageChanged() # in order to let parent class call observers
+        self.SetState()
         return True
 
     def AdditionalInfo4Msg(self):
@@ -307,10 +325,17 @@ class WaterTank(ABC):
     def GetHeight(self):
         """
         Should return the actual height of the tank. Straightforward for rectangular and vertical cylindrical.
-        For hosizontal cylindrical it should be the diameter, and for elliptical it should be the vertical axis.
+        For horizontal cylindrical it should be the diameter, and for elliptical it should be the vertical axis.
         """
         pass
         
+    @abstractmethod
+    def CalculatePercentage(self, measurement):
+        """
+        Return the percentage at which the tank is filled.
+        """
+        pass
+
     def CalculateNewState(self):
         print("Existing state:{}".format("None" if self.state is None else WaterTankState(self.state).name))
 
@@ -358,7 +383,46 @@ class WaterTank(ABC):
         print("New state is NORMAL")
         return WaterTankState.NORMAL
 
-    def StopStations(self, state):
+    def StopSignleStationOnPercentageChange(self, percentageBefore, station, station_mask, board_index, station_board_index,
+                                            overall_station_index):
+        if(station.run and station.percentage is not None and
+            station.start_datetime is not None and station.end_datetime is None
+        ):
+            if( (percentageBefore <= station.percentage and self.percentage > station.percentage) or
+                (percentageBefore >= station.percentage and self.percentage < station.percentage)
+            ):                           
+                print("Stopping on percentage change running station {}. {}".format(overall_station_index, gv.snames[overall_station_index]))
+                station_mask[board_index] = station_mask[board_index] | (1 << station_board_index);
+                station.end_datetime = datetime.now().replace(microsecond=0)                
+                gv.rs[overall_station_index][2] = 0         #set duration to 0
+                gv.rs[overall_station_index][1] = gv.now    #set stop time now
+                return True                                    
+
+        return False
+    
+    def StopStationsOnPercentageChange(self, percentageBefore):
+        station_changed = False
+        station_mask = [0] * gv.sd["nbrd"] # a list of bitmasks, each bitmask representing the 8 stations of a board                        
+        try:
+            for b in range(gv.sd["nbrd"]): # for all boards
+                for s in range(8): # for each station in the board
+                    i = b*8 + s
+                    key_i = str(i)
+                    if i + 1 == gv.sd["mas"]:
+                        continue  # skip if this is master valve
+                    station_changed = self.StopSignleStationOnPercentageChange(percentageBefore, self.overflow_stations[key_i],
+                        station_mask, b, s, i ) or station_changed
+                    station_changed = self.StopSignleStationOnPercentageChange(percentageBefore, self.warning_stations[key_i],
+                        station_mask, b, s, i ) or station_changed
+                    station_changed = self.StopSignleStationOnPercentageChange(percentageBefore, self.critical_stations[key_i],
+                        station_mask, b, s, i ) or station_changed
+
+            if(station_changed):
+                report_stations_scheduled()
+        except Exception as e:
+            print("Exception in StopStationsOnPercentageChange", e)
+
+    def StopStationsOnEventExit(self, state):
         valid_states = [WaterTankState.OVERFLOW, WaterTankState.WARNING, WaterTankState.CRITICAL, WaterTankState.OVERFLOW_UNSAFE, WaterTankState.WARNING_UNSAFE, WaterTankState.CRITICAL_UNSAFE]
         if(state not in valid_states):
             raise Exception("Invalid state: '{}'. Only states {} allowed in StopStations".
@@ -377,9 +441,9 @@ class WaterTank(ABC):
                 for s in range(8): # for each station in the board
                     i = b*8 + s
                     key_i = str(i)
-                    if(stations[key_i].run and 
+                    if(stations[key_i].run and stations[key_i].stop_on_exit and
                         stations[key_i].start_datetime is not None and stations[key_i].end_datetime is None ):
-                        print("Stopping running station {}. {}".format(i, gv.snames[i]))
+                        print("Stopping on event exit running station {}. {}".format(i, gv.snames[i]))
                         station_mask[b] = station_mask[b] | (1 << s);
                         stations[key_i].end_datetime = datetime.now().replace(microsecond=0)
                         if i + 1 == gv.sd["mas"]:
@@ -391,7 +455,7 @@ class WaterTank(ABC):
             if(station_changed):
                 report_stations_scheduled()
         except Exception as e:
-            print("Exception in ActivatePrograms state", e)
+            print("Exception in StopStationsOnEventExit", e)
             
     def RevertPrograms(self, state):
         """
@@ -610,7 +674,7 @@ class WaterTank(ABC):
         ):
             if(self.enabled):
                 self.RevertPrograms(self.state)
-                self.StopStations(self.state)
+                self.StopStationsOnEventExit(self.state)
 
         #
         # Activate programs for entering new state
@@ -643,23 +707,20 @@ class WaterTankRectangular(WaterTank):
         wt.height = None if not d["height"] else float(d["height"])
         return wt
                 
-
-    def UpdateSensorMeasurement(self, sensor_id, measurement):
-        if not super().UpdateSensorMeasurement(sensor_id, measurement):
+    def MeasurementIsValid(self, measurement):
+        if( not super().MeasurementIsValid(measurement)):
             return False
         
-        if self.width is not None and self.length is not None and self.height is not None:
-            volume = self.width * self.length * self.height
-            self.percentage = round(100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height)
-            if self.height < (measurement-self.sensor_offset_from_top):
-                self.invalid_sensor_measurement = True
-                send_invalid_measurement_msg(self,self.AdditionalInfo4Msg())
-                # print('WaterTankRectangular.UpdateSensorMeasurement returning False')
-                return False
+        if self.height < (measurement-self.sensor_offset_from_top):
+            return False
         
-        self.SignalPercentageChanged() # in order to let parent class call observers
-        self.SetState()
         return True
+
+    def CalculatePercentage(self, measurement):
+        if self.width is not None and self.length is not None and self.height is not None and self.height > 0:
+            return round(100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height)
+        
+        return None
 
     def GetHeight(self):
         return self.height
@@ -678,26 +739,27 @@ class WaterTankCylindricalHorizontal(WaterTank):
         wt.diameter = None if not d["diameter"] else float(d["diameter"])
         return wt
 
-    def UpdateSensorMeasurement(self, sensor_id, measurement):
-        if not super().UpdateSensorMeasurement(sensor_id, measurement):
+    def MeasurementIsValid(self, measurement):
+        if( not super().MeasurementIsValid(measurement)):
             return False
+        
+        if self.diameter < (measurement-self.sensor_offset_from_top):
+            return False
+        
+        return True
+    
+    def CalculatePercentage(self, measurement):
         if self.diameter is not None and self.length is not None:
             volume = self.diameter * self.length
             r = self.diameter / 2.0
             h = self.diameter - (measurement-self.sensor_offset_from_top)
-            if self.diameter < (measurement-self.sensor_offset_from_top):
-                self.invalid_sensor_measurement = True
             try:
                 liquid_volume = acos((r-h)/r)*(r**2) - (r-h)*sqrt(2*r*h - (h**2))
-                self.percentage = round(100.0 * liquid_volume / volume)
+                return round(100.0 * liquid_volume / volume)
             except:
-                self.invalid_sensor_measurement = True
-                self.percentage = None
-                return False
-
-        self.SignalPercentageChanged() # in order to let parent class call observers
-        self.SetState()
-        return True
+                return None
+        
+        return None
 
     def GetHeight(self):
         return self.diameter
@@ -716,21 +778,21 @@ class WaterTankCylindricalVertical(WaterTank):
         wt.diameter = None if not d["diameter"] else float(d["diameter"])
         return wt
 
-    def UpdateSensorMeasurement(self, sensor_id, measurement):
-        if not super().UpdateSensorMeasurement(sensor_id, measurement):
+    def MeasurementIsValid(self, measurement):
+        if( not super().MeasurementIsValid(measurement)):
             return False
         
-        if self.diameter is not None and self.height is not None:
-            volume = self.diameter * self.height
-            self.percentage = round(100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height)
-
-            if self.height < (measurement-self.sensor_offset_from_top):
-                self.invalid_sensor_measurement = True
-                return False
-            
-        self.SignalPercentageChanged() # in order to let parent class call observers
-        self.SetState()
+        if self.height < (measurement-self.sensor_offset_from_top):
+            return False
+        
         return True
+    
+    def CalculatePercentage(self, measurement):
+        if self.diameter is not None and self.height is not None and self.height > 0:
+            volume = self.diameter * self.height
+            return round(100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height)
+        
+        return None
 
     def GetHeight(self):
         return self.height
@@ -751,31 +813,30 @@ class WaterTankElliptical(WaterTank):
         wt.vertical_axis = None if not d["vertical_axis"] else float(d["vertical_axis"])
         return wt
 
-    def UpdateSensorMeasurement(self, sensor_id, measurement):
-        if not super().UpdateSensorMeasurement(sensor_id, measurement):
+    def MeasurementIsValid(self, measurement):
+        if( not super().MeasurementIsValid(measurement)):
             return False
         
-        if self.length is not None and self.horizontal_axis is not None and self.vertical_axis is not None:
+        if self.vertical_axis < (measurement-self.sensor_offset_from_top):
+            return False
+        
+        return True
+    
+    def CalculatePercentage(self, measurement):
+        if self.length is not None and self.horizontal_axis is not None and self.vertical_axis is not None and self.vertical_axis > 0:
             # from https://www.had2know.org/academics/ellipse-segment-tank-volume-calculator.html
             A = self.vertical_axis
             B = self.horizontal_axis
             H = self.vertical_axis - (measurement-self.sensor_offset_from_top)
             L = self.length
             volume = self.horizontal_axis/2.0 * self.vertical_axis/2.0 * self.length * pi
-            if self.vertical_axis < (measurement-self.sensor_offset_from_top):
-                self.invalid_sensor_measurement = True
-
             try:
                 liquid_volume = ((A*B*L)/4)*( acos(1.0 - 2.0*H/A) - (1.0 - 2.0*H/A)*sqrt(4*H/A - 4*(H**2)/(A**2)) )
-                self.percentage = round(100.0 * liquid_volume / volume)
+                return round(100.0 * liquid_volume / volume)
             except:
-                self.invalid_sensor_measurement = True
-                self.percentage = None
-                return False
+                return None
             
-        self.SignalPercentageChanged() # in order to let parent class call observers
-        self.SetState()
-        return True
+        return None
 
     def GetHeight(self):
         return self.vertical_axis

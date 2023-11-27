@@ -301,7 +301,7 @@ form.water-tank input{
     min-width: auto;
     width: fit-content;
     margin-bottom: 1em;
-    margin-right: 0.2em;
+    margin-right: 0.65em;
 }
 
 .water-tank label.station {
@@ -312,21 +312,29 @@ form.water-tank input{
     font-size: smaller;
     font-family: monospace;
     color: #2E3959;
+    padding: 0px!important;
 }
 
 .water-tank .station input[type=checkbox]{
     vertical-align: middle;
     position: relative;
     margin-left: 0px;
-    margin-right: 0px;
+    margin-right: 0.3em;
     margin-bottom: inherit;
 }
 
 .water-tank .station .duration,
-.water-tank .station .percentage {
+.water-tank .station .percentage,
+.water-tank .station .stop {
     width: 2em;
     font-size: 1em;
     margin-right: 0.4em;
+    padding-left: 0px!important;
+}
+
+.water-tank .station .stop {
+    width: 13px;
+    margin-right: 4px;
 }
 
 .water-tank .station .error {
