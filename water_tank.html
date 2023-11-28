@@ -488,6 +488,8 @@ function getWaterTankStateName(stateValue)
             jQuery("#critical_pr_suspend_$i").prop('checked', water_tank.critical_programs["$i"].suspend);
         
         $for i in range(0, len(snames)):
+        $ show = (gv.sd['show'][i//8]>>(i%8))&1
+            $if show == 1:
             jQuery("#overflow_sn_run_$i").prop('checked', water_tank.overflow_stations["$i"].run);
             jQuery("#overflow_sn_minutes_$i").val(water_tank.overflow_stations["$i"].minutes);
             jQuery("#overflow_sn_percentage_$i").val(water_tank.overflow_stations["$i"].percentage);
@@ -835,7 +837,7 @@ function getWaterTankStateName(stateValue)
         <p class="info">$_('Specify water levels (% of total water tank volume) at which the water tank enters OVERFLOW, WARNING, and CRITICAL state.')</p>
         <p class="info">$_('Specify a corresponding SAFETY level that must be crossed in order to consider the state as exited.')</p>
         <p class="info">$_('Specify programs to run, be enabled, suspended when entering a state. The program status will be reverted upon exiting the state.')</p>
-        <p class="info">$_('Specify stations that will run for a specific amount of time, or until a certain percentage is crossed, or until the state is exited.')</p>
+        <p class="info">$_('Specify stations that will run for a specific amount of time, or until a certain percentage is crossed, or until the state is exited - whatever comes first.')</p>
         <p class="info">$_('Specify which emails and xmpp accounts to notify when entering a state.')</p>
 
         <div><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Overflow')</h4><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span></div>
@@ -863,17 +865,19 @@ function getWaterTankStateName(stateValue)
             </div>
             <div style="display:flex; flex-wrap: wrap; width: fit-content;">
                 $for i in range(0, len(snames)):
-                <div class="station">
-                    <label class="station">
-                        <input class="station_run" id="overflow_sn_run_$i" name="overflow_sn_run_$i" type="checkbox" onclick="uncheckRunPrograms(this,'overflow',$i);"/>
-                        $snames[i]
-                    </label>
-                    <label class="station-action">
-                        <input class="duration" id="overflow_sn_minutes_$i" name="overflow_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')
-                    </label>
-                    <label class="station-action"><input class="percentage" id="overflow_sn_percentage_$i" name="overflow_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>
-                    <label class="station-action"><input class="stop" id="overflow_sn_stop_on_exit_$i" name="overflow_sn_stop_on_exit_$i" type="checkbox"/>$_('Event Stop')</label>
-                </div>             
+                $ show = (gv.sd['show'][i//8]>>(i%8))&1
+                    $if show == 1:
+                        <div class="station">
+                            <label class="station">
+                                <input class="station_run" id="overflow_sn_run_$i" name="overflow_sn_run_$i" type="checkbox" onclick="uncheckRunPrograms(this,'overflow',$i);"/>
+                                $snames[i]
+                            </label>
+                            <label class="station-action">
+                                <input class="duration" id="overflow_sn_minutes_$i" name="overflow_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')
+                            </label>
+                            <label class="station-action"><input class="percentage" id="overflow_sn_percentage_$i" name="overflow_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>
+                            <label class="station-action"><input class="stop" id="overflow_sn_stop_on_exit_$i" name="overflow_sn_stop_on_exit_$i" type="checkbox"/>$_('State Exit')</label>
+                        </div>             
             </div>     
         </fieldset>
 
@@ -902,17 +906,18 @@ function getWaterTankStateName(stateValue)
             </div>
             <div style="display:flex; flex-wrap: wrap; width: fit-content;">
                 $for i in range(0, len(snames)):
-                <div class="station">
-                    <label class="station">
-                        <input class="station_run" id="warning_sn_run_$i" name="warning_sn_run_$i" type="checkbox" onclick="uncheckRunPrograms(this,'warning',$i);"/>
-                        $snames[i]
-                    </label>
-                    <label class="station-action">
-                        <input class="duration" id="warning_sn_minutes_$i" name="warning_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
-                    <label class="station-action"><input class="percentage" id="warning_sn_percentage_$i" name="warning_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>   
-                    <label class="station-action"><input class="stop" id="warning_sn_stop_on_exit_$i" name="warning_sn_stop_on_exit_$i" type="checkbox"/>$_('Event Stop')</label>
-
-                </div>             
+                $ show = (gv.sd['show'][i//8]>>(i%8))&1
+                    $if show == 1:
+                        <div class="station">
+                            <label class="station">
+                                <input class="station_run" id="warning_sn_run_$i" name="warning_sn_run_$i" type="checkbox" onclick="uncheckRunPrograms(this,'warning',$i);"/>
+                                $snames[i]
+                            </label>
+                            <label class="station-action">
+                                <input class="duration" id="warning_sn_minutes_$i" name="warning_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
+                            <label class="station-action"><input class="percentage" id="warning_sn_percentage_$i" name="warning_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>   
+                            <label class="station-action"><input class="stop" id="warning_sn_stop_on_exit_$i" name="warning_sn_stop_on_exit_$i" type="checkbox"/>$_('State Exit')</label>
+                        </div>             
             </div> 
         </fieldset>
 
@@ -941,16 +946,18 @@ function getWaterTankStateName(stateValue)
             </div>
             <div style="display:flex; flex-wrap: wrap; width: fit-content;">
                 $for i in range(0, len(snames)):
-                <div class="station">
-                    <label class="station">
-                        <input class="station_run" id="critical_sn_run_$i" name="critical_sn_run_$i" type="checkbox" onclick="uncheckRunPrograms(this,'critical',$i);"/>
-                        $snames[i]
-                    </label>
-                    <label class="station-action">
-                        <input class="duration" id="critical_sn_minutes_$i" name="critical_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
-                    <label class="station-action"><input class="percentage" id="critical_sn_percentage_$i" name="critical_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>  
-                    <label class="station-action"><input class="stop" id="critical_sn_stop_on_exit_$i" name="critical_sn_stop_on_exit_$i" type="checkbox"/>$_('Event Stop')</label>
-                </div>             
+                $ show = (gv.sd['show'][i//8]>>(i%8))&1
+                    $if show == 1:
+                        <div class="station">
+                            <label class="station">
+                                <input class="station_run" id="critical_sn_run_$i" name="critical_sn_run_$i" type="checkbox" onclick="uncheckRunPrograms(this,'critical',$i);"/>
+                                $snames[i]
+                            </label>
+                            <label class="station-action">
+                                <input class="duration" id="critical_sn_minutes_$i" name="critical_sn_minutes_$i" type="number" min="0" max="$settings['max_station_duration']"/>$_('Mins')</label>
+                            <label class="station-action"><input class="percentage" id="critical_sn_percentage_$i" name="critical_sn_percentage_$i" type="number" min="0" max="100"/>$_('%')</label>  
+                            <label class="station-action"><input class="stop" id="critical_sn_stop_on_exit_$i" name="critical_sn_stop_on_exit_$i" type="checkbox"/>$_('State Exit')</label>
+                        </div>             
             </div>          
         </fieldset>
 

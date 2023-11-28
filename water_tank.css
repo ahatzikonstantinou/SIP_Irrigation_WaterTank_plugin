@@ -350,3 +350,7 @@ form.water-tank input{
 #sensor-log p {
     text-align: left;
 }
+
+#sensor_log_enabled  {
+    width: fit-content;
+}

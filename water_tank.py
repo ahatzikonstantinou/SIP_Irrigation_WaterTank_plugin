@@ -224,29 +224,31 @@ class WaterTank(ABC):
                 )
 
             for i in range(0, len(gv.snames)):
-                overflow_stations[i] = WaterTankStation(
-                    station_id = i,
-                    run = ('overflow_sn_run_' + str(i) in d and str(d['overflow_sn_run_' + str(i)]) in ["on", "true", "True"]),
-                    minutes = None if not d["overflow_sn_minutes_" + str(i)] else int(d["overflow_sn_minutes_" + str(i)]),
-                    percentage = None if not d["overflow_sn_percentage_" + str(i)] else int(d["overflow_sn_percentage_" + str(i)]),
-                    stop_on_exit = ('overflow_sn_stop_on_exit_' + str(i) in d and str(d['overflow_sn_stop_on_exit_' + str(i)]) in ["on", "true", "True"]),
-                )
+                station_enabled = (gv.sd['show'][i//8]>>(i%8))&1
+                if station_enabled == 1:                        
+                    overflow_stations[i] = WaterTankStation(
+                        station_id = i,
+                        run = ('overflow_sn_run_' + str(i) in d and str(d['overflow_sn_run_' + str(i)]) in ["on", "true", "True"]),
+                        minutes = None if not d["overflow_sn_minutes_" + str(i)] else int(d["overflow_sn_minutes_" + str(i)]),
+                        percentage = None if not d["overflow_sn_percentage_" + str(i)] else int(d["overflow_sn_percentage_" + str(i)]),
+                        stop_on_exit = ('overflow_sn_stop_on_exit_' + str(i) in d and str(d['overflow_sn_stop_on_exit_' + str(i)]) in ["on", "true", "True"]),
+                    )
 
-                warning_stations[i] = WaterTankStation(
-                    station_id = i,
-                    run = ('warning_sn_run_' + str(i) in d and str(d['warning_sn_run_' + str(i)]) in ["on", "true", "True"]),
-                    minutes = None if not d["warning_sn_minutes_" + str(i)] else int(d["warning_sn_minutes_" + str(i)]),
-                    percentage = None if not d["warning_sn_percentage_" + str(i)] else int(d["warning_sn_percentage_" + str(i)]),
-                    stop_on_exit = ('warning_sn_stop_on_exit_' + str(i) in d and str(d['warning_sn_stop_on_exit_' + str(i)]) in ["on", "true", "True"]),
-                )
+                    warning_stations[i] = WaterTankStation(
+                        station_id = i,
+                        run = ('warning_sn_run_' + str(i) in d and str(d['warning_sn_run_' + str(i)]) in ["on", "true", "True"]),
+                        minutes = None if not d["warning_sn_minutes_" + str(i)] else int(d["warning_sn_minutes_" + str(i)]),
+                        percentage = None if not d["warning_sn_percentage_" + str(i)] else int(d["warning_sn_percentage_" + str(i)]),
+                        stop_on_exit = ('warning_sn_stop_on_exit_' + str(i) in d and str(d['warning_sn_stop_on_exit_' + str(i)]) in ["on", "true", "True"]),
+                    )
 
-                critical_stations[i] = WaterTankStation(
-                    station_id = i,
-                    run = ('critical_sn_run_' + str(i) in d and str(d['critical_sn_run_' + str(i)]) in ["on", "true", "True"]),
-                    minutes = None if not d["critical_sn_minutes_" + str(i)] else int(d["critical_sn_minutes_" + str(i)]),
-                    percentage = None if not d["critical_sn_percentage_" + str(i)] else int(d["critical_sn_percentage_" + str(i)]),
-                    stop_on_exit = ('critical_sn_stop_on_exit_' + str(i) in d and str(d['critical_sn_stop_on_exit_' + str(i)]) in ["on", "true", "True"]),
-                )
+                    critical_stations[i] = WaterTankStation(
+                        station_id = i,
+                        run = ('critical_sn_run_' + str(i) in d and str(d['critical_sn_run_' + str(i)]) in ["on", "true", "True"]),
+                        minutes = None if not d["critical_sn_minutes_" + str(i)] else int(d["critical_sn_minutes_" + str(i)]),
+                        percentage = None if not d["critical_sn_percentage_" + str(i)] else int(d["critical_sn_percentage_" + str(i)]),
+                        stop_on_exit = ('critical_sn_stop_on_exit_' + str(i) in d and str(d['critical_sn_stop_on_exit_' + str(i)]) in ["on", "true", "True"]),
+                    )
 
         self.id = d["id"]
         self.label = d["label"]
@@ -441,7 +443,9 @@ class WaterTank(ABC):
                 for s in range(8): # for each station in the board
                     i = b*8 + s
                     key_i = str(i)
-                    if(stations[key_i].run and stations[key_i].stop_on_exit and
+                    station_enabled = (gv.sd['show'][b]>>s)&1
+                    if( station_enabled == 1 and
+                        stations[key_i].run and stations[key_i].stop_on_exit and
                         stations[key_i].start_datetime is not None and stations[key_i].end_datetime is None ):
                         print("Stopping on event exit running station {}. {}".format(i, gv.snames[i]))
                         station_mask[b] = station_mask[b] | (1 << s);
@@ -522,7 +526,8 @@ class WaterTank(ABC):
                 for s in range(8): # for each station in the board
                     i = b*8 + s
                     key_i = str(i)
-                    if(sns[key_i].run):
+                    station_enabled = (gv.sd['show'][b]>>s)&1
+                    if( station_enabled == 1 and sns[key_i].run):
                         print("Running station {}. {}".format(i, gv.snames[i]))
                         station_mask[b] = station_mask[b] | (1 << s);
                         sns[key_i].start_datetime = datetime.now().replace(microsecond=0)
@@ -615,30 +620,30 @@ class WaterTank(ABC):
         return False
 
     def RunningProgramChanged(self):
-        print("RunningProgramChanged for state: {}".format(None if self.state is None else self.state.name))
+        # print("RunningProgramChanged for state: {}".format(None if self.state is None else self.state.name))
         programUpdated = False
-        print("Doing OVERFLOW programs.")
+        # print("Doing OVERFLOW programs.")
         for p_id, program in self.overflow_programs.items():
             programUpdated = self.CheckAndMarkProgramEnd(program, self.state in [WaterTankState.OVERFLOW, WaterTankState.OVERFLOW_UNSAFE] ) or programUpdated
-        print("Doing WARNING programs.")
+        # print("Doing WARNING programs.")
         for p_id, program in self.warning_programs.items():
             programUpdated = self.CheckAndMarkProgramEnd(program, self.state in [WaterTankState.WARNING, WaterTankState.WARNING_UNSAFE]) or programUpdated
-        print("Doing CRITICAL programs.")
+        # print("Doing CRITICAL programs.")
         for p_id, program in self.critical_programs.items():
             programUpdated = self.CheckAndMarkProgramEnd(program, self.state in [WaterTankState.CRITICAL, WaterTankState.CRITICAL_UNSAFE]) or programUpdated
 
         return programUpdated
     
     def ZoneChanged(self):
-        print("StationCompleted for state: {}".format(None if self.state is None else self.state.name))
+        # print("StationCompleted for state: {}".format(None if self.state is None else self.state.name))
         stationUpdated = False
-        print("Doing OVERFLOW stations.")
+        # print("Doing OVERFLOW stations.")
         for station_id, station in self.overflow_stations.items():
             stationUpdated = self.CheckAndMarkStationEnd(station) or stationUpdated
-        print("Doing WARNING stations.")
+        # print("Doing WARNING stations.")
         for station_id, station in self.warning_stations.items():
             stationUpdated = self.CheckAndMarkStationEnd(station) or stationUpdated
-        print("Doing CRITICAL stations.")
+        # print("Doing CRITICAL stations.")
         for station_id, station in self.critical_stations.items():
             stationUpdated = self.CheckAndMarkStationEnd(station) or stationUpdated
 
