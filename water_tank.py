@@ -49,6 +49,24 @@ class WaterTankState(IntEnum):
     CRITICAL_UNSAFE = 7
 
 
+class LengthUnit(IntEnum):
+    CENTIMETERS = 1
+    METERS = 2
+    INCHES = 3
+    FEET = 4
+
+    @staticmethod
+    def ConvertToMeters(unit, number):
+        if( unit == LengthUnit.METERS ):
+            return number
+        elif( unit == LengthUnit.CENTIMETERS ):
+            return number / 100
+        elif( unit == LengthUnit.INCHES):
+            return number * 0.0254
+        else:
+            return number * 0.3048
+
+
 class WaterTankProgram():
     """
     These are the programs that run, are enabled or suspended when 
@@ -80,7 +98,7 @@ class WaterTankStation():
 
 
 class WaterTank(ABC):
-    def __init__(self, id, label, type, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp, overflow_stations = None, warning_stations = None, critical_stations = None):
+    def __init__(self, id, label, type, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, water_tank_units, sensor_units, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp, overflow_stations = None, warning_stations = None, critical_stations = None):
         self.id = id
         self.label = label
         self.type = type
@@ -91,6 +109,8 @@ class WaterTank(ABC):
         self.sensor_offset_from_top = sensor_offset_from_top
         self.min_valid_sensor_measurement = min_valid_sensor_measurement
         self.max_valid_sensor_measurement = max_valid_sensor_measurement
+        self.water_tank_units = water_tank_units
+        self.sensor_units = sensor_units
         self.enabled = enabled
         self.overflow_level = overflow_level
         self.overflow_email = overflow_email
@@ -259,6 +279,8 @@ class WaterTank(ABC):
         self.sensor_offset_from_top = float(d["sensor_offset_from_top"])
         self.min_valid_sensor_measurement = None if "min_valid_sensor_measurement" not in d or not d["min_valid_sensor_measurement"] else float(d["min_valid_sensor_measurement"])
         self.max_valid_sensor_measurement = None if "max_valid_sensor_measurement"not in d or not d["max_valid_sensor_measurement"] else float(d["max_valid_sensor_measurement"])
+        self.water_tank_units = WaterTankType( int(d["water_tank_units"]) )
+        self.sensor_units = WaterTankType( int(d["sensor_units"]) )
         self.enabled = ("enabled" in d and str(d["enabled"]) in ["on", "true", "True"])
         self.overflow_level = None if not d["overflow_level"] else float(d["overflow_level"])
         self.overflow_email = ('overflow_email' in d and (str(d["overflow_email"]) in ["on", "true", "True"]))
@@ -288,9 +310,13 @@ class WaterTank(ABC):
         self.state = None if "state" not in d or d["state"] is None or d["state"] == "null" else WaterTankState( int(d["state"]) )
 
     def MeasurementIsValid(self, measurement):
+        h = LengthUnit.ConvertToMeters(self.water_tank_units, self.GetHeight())
+        m = LengthUnit.ConvertToMeters(self.sensor_units, measurement)
+        o = LengthUnit.ConvertToMeters(self.water_tank_units, self.sensor_offset_from_top)
+        print( "Validating h:{}, m: {}, offset:{}".format(h, m, o))
         if( (self.min_valid_sensor_measurement is not None and measurement < self.min_valid_sensor_measurement) or 
             (self.max_valid_sensor_measurement is not None and measurement > self.max_valid_sensor_measurement) or
-            (self.GetHeight() < (measurement - self.sensor_offset_from_top)) or
+            (h < (m - o)) or
             (measurement < 0)
         ):
             return False
@@ -698,8 +724,8 @@ class WaterTank(ABC):
     
 
 class WaterTankRectangular(WaterTank):
-    def __init__(self, id = None, label = None, width = None, length = None, height = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_safe_level = None, warning_email = None, warning_xmpp = None, warning_programs = None, critical_level = None, critical_safe_level = None, critical_email = None, critical_xmpp = None, critical_programs = None, loss_email = None, loss_xmpp = None):
-        super().__init__(id, label, WaterTankType.RECTANGULAR.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp)
+    def __init__(self, id = None, label = None, width = None, length = None, height = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, water_tank_units = None, sensor_units = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_safe_level = None, warning_email = None, warning_xmpp = None, warning_programs = None, critical_level = None, critical_safe_level = None, critical_email = None, critical_xmpp = None, critical_programs = None, loss_email = None, loss_xmpp = None):
+        super().__init__(id, label, WaterTankType.RECTANGULAR.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement,  water_tank_units, sensor_units, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp)
         self.width = width
         self.length = length
         self.height = height
@@ -716,14 +742,16 @@ class WaterTankRectangular(WaterTank):
         if( not super().MeasurementIsValid(measurement)):
             return False
         
-        if self.height < (measurement-self.sensor_offset_from_top):
+        if( LengthUnit.ConvertToMeters(self.water_tank_units, self.height) < (LengthUnit.ConvertToMeters(self.sensor_units, measurement) - LengthUnit.ConvertToMeters(self.water_tank_units, self.sensor_offset_from_top)) ):
             return False
         
         return True
 
     def CalculatePercentage(self, measurement):
         if self.width is not None and self.length is not None and self.height is not None and self.height > 0:
-            return round(100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height)
+            h = LengthUnit.ConvertToMeters(self.water_tank_units, self.height)
+            d = LengthUnit.ConvertToMeters(self.sensor_units, measurement) - LengthUnit.ConvertToMeters(self.water_tank_units, self.sensor_offset_from_top)
+            return round(100.0 * (h -d) / h)
         
         return None
 
@@ -732,8 +760,8 @@ class WaterTankRectangular(WaterTank):
 
 
 class WaterTankCylindricalHorizontal(WaterTank):
-    def __init__(self, id = None, label = None, length = None, diameter = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_safe_level = None, warning_email = None, warning_xmpp = None, warning_programs = None, critical_level = None, critical_safe_level = None, critical_email = None, critical_xmpp = None, critical_programs = None, loss_email = None, loss_xmpp = None):
-        super().__init__(id, label, WaterTankType.CYLINDRICAL_HORIZONTAL.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp)
+    def __init__(self, id = None, label = None, length = None, diameter = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, water_tank_units = None, sensor_units = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_safe_level = None, warning_email = None, warning_xmpp = None, warning_programs = None, critical_level = None, critical_safe_level = None, critical_email = None, critical_xmpp = None, critical_programs = None, loss_email = None, loss_xmpp = None):
+        super().__init__(id, label, WaterTankType.CYLINDRICAL_HORIZONTAL.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, water_tank_units, sensor_units, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp)
         self.length = length
         self.diameter = diameter
 
@@ -748,16 +776,16 @@ class WaterTankCylindricalHorizontal(WaterTank):
         if( not super().MeasurementIsValid(measurement)):
             return False
         
-        if self.diameter < (measurement-self.sensor_offset_from_top):
+        if( LengthUnit.ConvertToMeters(self.water_tank_units, self.diameter) < (LengthUnit.ConvertToMeters(self.sensor_units, measurement) - LengthUnit.ConvertToMeters(self.water_tank_units, self.sensor_offset_from_top))):
             return False
         
         return True
     
     def CalculatePercentage(self, measurement):
         if self.diameter is not None and self.length is not None:
-            volume = self.diameter * self.length
-            r = self.diameter / 2.0
-            h = self.diameter - (measurement-self.sensor_offset_from_top)
+            volume = LengthUnit.ConvertToMeters(self.water_tank_units, self.diameter) * LengthUnit.ConvertToMeters(self.water_tank_units, self.length)
+            r = LengthUnit.ConvertToMeters(self.water_tank_units, self.diameter) / 2.0
+            h = LengthUnit.ConvertToMeters(self.water_tank_units, self.diameter) - (LengthUnit.ConvertToMeters(self.sensor_units, measurement) - LengthUnit.ConvertToMeters(self.water_tank_units, self.sensor_offset_from_top))
             try:
                 liquid_volume = acos((r-h)/r)*(r**2) - (r-h)*sqrt(2*r*h - (h**2))
                 return round(100.0 * liquid_volume / volume)
@@ -771,8 +799,8 @@ class WaterTankCylindricalHorizontal(WaterTank):
 
 
 class WaterTankCylindricalVertical(WaterTank):
-    def __init__(self, id = None, label = None, diameter = None, height = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_safe_level = None, warning_email = None, warning_xmpp = None, warning_programs = None, critical_level = None, critical_safe_level = None, critical_email = None, critical_xmpp = None, critical_programs = None, loss_email = None, loss_xmpp = None):
-        super().__init__(id, label, WaterTankType.CYLINDRICAL_VERTICAL.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp)
+    def __init__(self, id = None, label = None, diameter = None, height = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, water_tank_units = None, sensor_units = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_safe_level = None, warning_email = None, warning_xmpp = None, warning_programs = None, critical_level = None, critical_safe_level = None, critical_email = None, critical_xmpp = None, critical_programs = None, loss_email = None, loss_xmpp = None):
+        super().__init__(id, label, WaterTankType.CYLINDRICAL_VERTICAL.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, water_tank_units, sensor_units, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp)
         self.height = height
         self.diameter = diameter
 
@@ -787,15 +815,18 @@ class WaterTankCylindricalVertical(WaterTank):
         if( not super().MeasurementIsValid(measurement)):
             return False
         
-        if self.height < (measurement-self.sensor_offset_from_top):
+        if( LengthUnit.ConvertToMeters(self.water_tank_units, self.height) < (LengthUnit.ConvertToMeters(self.sensor_units, measurement) - LengthUnit.ConvertToMeters(self.water_tank_units, self.sensor_offset_from_top) ) ):
             return False
         
         return True
     
     def CalculatePercentage(self, measurement):
         if self.diameter is not None and self.height is not None and self.height > 0:
-            volume = self.diameter * self.height
-            return round(100.0 * (self.height - (measurement-self.sensor_offset_from_top)) / self.height)
+            h = LengthUnit.ConvertToMeters(self.water_tank_units, self.height)
+            d = LengthUnit.ConvertToMeters(self.water_tank_units, self.diameter)
+            x = LengthUnit.ConvertToMeters(self.sensor_units, measurement) - LengthUnit.ConvertToMeters(self.water_tank_units, self.sensor_offset_from_top)
+            volume = d * h
+            return round(100.0 * (h - x) / h)
         
         return None
 
@@ -804,8 +835,8 @@ class WaterTankCylindricalVertical(WaterTank):
 
 
 class WaterTankElliptical(WaterTank):
-    def __init__(self, id = None, label = None, length = None, horizontal_axis = None, vertical_axis = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_safe_level = None, warning_email = None, warning_xmpp = None, warning_programs = None, critical_level = None, critical_safe_level = None, critical_email = None, critical_xmpp = None, critical_programs = None, loss_email = None, loss_xmpp = None):
-        super().__init__(id, label, WaterTankType.ELLIPTICAL.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp)
+    def __init__(self, id = None, label = None, length = None, horizontal_axis = None, vertical_axis = None, sensor_mqtt_topic = None, invalid_sensor_measurement_email = None, invalid_sensor_measurement_xmpp = None, sensor_id = None, sensor_offset_from_top = None, min_valid_sensor_measurement = None,max_valid_sensor_measurement = None, water_tank_units = None, sensor_units = None, enabled = None, overflow_level = None, overflow_email = None, overflow_xmpp = None, overflow_safe_level = None, overflow_programs = None, warning_level = None, warning_safe_level = None, warning_email = None, warning_xmpp = None, warning_programs = None, critical_level = None, critical_safe_level = None, critical_email = None, critical_xmpp = None, critical_programs = None, loss_email = None, loss_xmpp = None):
+        super().__init__(id, label, WaterTankType.ELLIPTICAL.value, sensor_mqtt_topic, invalid_sensor_measurement_email, invalid_sensor_measurement_xmpp, sensor_id, sensor_offset_from_top, min_valid_sensor_measurement, max_valid_sensor_measurement, water_tank_units, sensor_units, enabled, overflow_level, overflow_email, overflow_xmpp, overflow_safe_level, overflow_programs, warning_level, warning_safe_level, warning_email, warning_xmpp, warning_programs, critical_level, critical_safe_level, critical_email, critical_xmpp, critical_programs, loss_email, loss_xmpp)
         self.length = length
         self.horizontal_axis = horizontal_axis
         self.vertical_axis = vertical_axis
@@ -822,7 +853,7 @@ class WaterTankElliptical(WaterTank):
         if( not super().MeasurementIsValid(measurement)):
             return False
         
-        if self.vertical_axis < (measurement-self.sensor_offset_from_top):
+        if( LengthUnit.ConvertToMeters(self.water_tank_units, self.vertical_axis) < (LengthUnit.ConvertToMeters(self.sensor_units, measurement) - LengthUnit.ConvertToMeters(self.water_tank_units, self.sensor_offset_from_top) ) ):
             return False
         
         return True
@@ -830,11 +861,11 @@ class WaterTankElliptical(WaterTank):
     def CalculatePercentage(self, measurement):
         if self.length is not None and self.horizontal_axis is not None and self.vertical_axis is not None and self.vertical_axis > 0:
             # from https://www.had2know.org/academics/ellipse-segment-tank-volume-calculator.html
-            A = self.vertical_axis
-            B = self.horizontal_axis
-            H = self.vertical_axis - (measurement-self.sensor_offset_from_top)
-            L = self.length
-            volume = self.horizontal_axis/2.0 * self.vertical_axis/2.0 * self.length * pi
+            A = LengthUnit.ConvertToMeters(self.water_tank_units, self.vertical_axis)
+            B = LengthUnit.ConvertToMeters(self.water_tank_units, self.horizontal_axis)
+            H = LengthUnit.ConvertToMeters(self.water_tank_units, self.vertical_axis) - (LengthUnit.ConvertToMeters(self.sensor_units, measurement) - LengthUnit.ConvertToMeters(self.water_tank_units, self.sensor_offset_from_top) )
+            L = LengthUnit.ConvertToMeters(self.water_tank_units, self.length)
+            volume = B/2.0 * A/2.0 * L * pi
             try:
                 liquid_volume = ((A*B*L)/4)*( acos(1.0 - 2.0*H/A) - (1.0 - 2.0*H/A)*sqrt(4*H/A - 4*(H**2)/(A**2)) )
                 return round(100.0 * liquid_volume / volume)

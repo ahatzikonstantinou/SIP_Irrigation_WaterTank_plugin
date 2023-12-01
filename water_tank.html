@@ -411,6 +411,8 @@ function getWaterTankStateName(stateValue)
         jQuery("#label").val(water_tank.label);
         jQuery("#enabled").prop('checked', water_tank.enabled);
         jQuery("input[name=type][value=" + water_tank.type + "]").click();
+        jQuery("input[name=water_tank_units][value=" + water_tank.water_tank_units + "]").click();
+        jQuery("input[name=sensor_units][value=" + water_tank.sensor_units + "]").click();
 
         jQuery("#width").val(water_tank.width);
         jQuery("#length").val(water_tank.length);
@@ -816,6 +818,20 @@ function getWaterTankStateName(stateValue)
             <label>$_('Invalid sensor measurement'):</label><div><img src="/static/images/warning-icon24x24.png" id="invalid_sensor_measurement" name="invalid_sensor_measurement" style="visibility:hidden"/></div>
             <label>$_('Last updated'):</label><div><input type=text id="last_updated" name="last_updated" value="" readonly/></div>
             <label>$_('Full %'):</label><div><input type=number id="percentage" name="percentage" value="" readonly/></div>
+            <label>$_('Sensor Units'):</label>
+            <fieldset class="one-col">
+                <label><input type="radio" name="sensor_units" value="1" hidden>$_('CENTIMETERS')</label>
+                <label><input type="radio" name="sensor_units" value="2" hidden>$_('METERS')</label>
+                <label><input type="radio" name="sensor_units" value="3" hidden>$_('INCHES')</label>
+                <label><input type="radio" name="sensor_units" value="4" hidden>$_('FEET')</label>
+            </fieldset>
+            <label>$_('Water Tank Units'):</label>
+            <fieldset class="one-col">
+                <label><input type="radio" name="water_tank_units" value="1" hidden>$_('CENTIMETERS')</label>
+                <label><input type="radio" name="water_tank_units" value="2" hidden>$_('METERS')</label>
+                <label><input type="radio" name="water_tank_units" value="3" hidden>$_('INCHES')</label>
+                <label><input type="radio" name="water_tank_units" value="4" hidden>$_('FEET')</label>
+            </fieldset>
             <label>$_('Enabled'):</label><div><input type="checkbox" id="enabled" name="enabled"/></div>
             <label>$_('Notify for invalid measurements'):</label><div style="display:flex; flex-wrap: wrap;">
                 <label>Email<input id="invalid_sensor_measurement_email" name="invalid_sensor_measurement_email" type="checkbox"/></label>
