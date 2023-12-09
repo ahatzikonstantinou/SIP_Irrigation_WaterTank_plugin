@@ -622,7 +622,49 @@ function getWaterTankStateName(stateValue)
         $for i in range(0, len(pnames)):
             jQuery('#'+state+'_pr_run_$i').prop('checked', false);
             // console.log("Unchecked " + '#'+state+'_pr_run_$i');
+    }    
+
+
+const LengthUnits = {
+    CENTIMETERS : 1,
+    METERS : 2,
+    INCHES : 3,
+    FEET : 4
+}
+
+function getUnitsText(units)
+{
+    switch(units)
+    {
+        case LengthUnits.CENTIMETERS: return " $_('cm')";
+        case LengthUnits.METERS: return " $_('m')";
+        case LengthUnits.INCHES: return " $_('in')";
+        case LengthUnits.FEET: return " $_('feet')";
+        default:
+            console.log("Unknown units " + units);
+            return null;
     }
+}
+
+function sensorUnitsSelected(units)
+{
+    let txt = getUnitsText(units);
+    if(txt == null)
+    {
+        return;
+    }
+    jQuery("[name='sensor_units_txt']").text(txt);
+}
+function waterTankUnitsSelected(units)
+{
+    let txt = getUnitsText(units);
+    if(txt == null)
+    {
+        return;
+    }
+    jQuery("[name='water_tank_units_txt'").text(txt);
+}
+
 </script>
 
 <div id="plugin" class="water-tank">
@@ -803,34 +845,34 @@ function getWaterTankStateName(stateValue)
                 <label><input type="radio" name="type" value="3" hidden onClick="typeSelected(3)">$_('CYLINDRICAL_VERTICAL')</label>
                 <label><input type="radio" name="type" value="4" hidden onClick="typeSelected(4)">$_('ELLIPTICAL')</label>
             </fieldset>
-            <label>$_('Width'):</label><div><input type=number min=0 id="width" name="width" value=""/></div>
-            <label>$_('Length'):</label><div><input type=number min=0 id="length" name="length" value=""/></div>
-            <label>$_('Diameter'):</label><div><input type=number min=0 id="diameter" name="diameter" value=""/></div>
-            <label>$_('Height'):</label><div><input type=number min=0 id="height" name="height" value=""/></div>
-            <label>$_('Horizontal Axis'):</label><div><input type=number min=0 id="horizontal_axis" name="horizontal_axis" value=""/></div>
-            <label>$_('Vertical Axis'):</label><div><input type=number min=0 id="vertical_axis" name="vertical_axis" value=""/></div>
+            <label>$_('Width'):</label><div><input type=number min=0 id="width" name="width" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Length'):</label><div><input type=number min=0 id="length" name="length" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Diameter'):</label><div><input type=number min=0 id="diameter" name="diameter" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Height'):</label><div><input type=number min=0 id="height" name="height" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Horizontal Axis'):</label><div><input type=number min=0 id="horizontal_axis" name="horizontal_axis" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Vertical Axis'):</label><div><input type=number min=0 id="vertical_axis" name="vertical_axis" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
             <label>$_('Sensor Mqtt Topic'):</label><div><input type=text id="sensor_mqtt_topic" name="sensor_mqtt_topic" value=""/></div>
             <label>$_('Sensor ID'):</label><div><input type=text id="sensor_id" name="sensor_id" required/></div>
-            <label>$_('Sensor offset from top'):</label><div><input type=number id="sensor_offset_from_top" name="sensor_offset_from_top" value="0.0" required/></div>
-            <label>$_('Min valid sesnor measurment'):</label><div><input type=number id="min_valid_sensor_measurement" name="min_valid_sensor_measurement" value=""/></div>
-            <label>$_('Max valid sensor measurment'):</label><div><input type=number id="max_valid_sensor_measurement" name="max_valid_sensor_measurement" value=""/></div>
-            <label>$_('Sensor measurment'):</label><div><input type=number id="sensor_measurement" name="sensor_measurement" value=""readonly/></div>
+            <label>$_('Sensor offset from top'):</label><div><input type=number id="sensor_offset_from_top" name="sensor_offset_from_top" value="0.0" required/><span name="water_tank_units_txt">$_('cm')</span></div>
+            <label>$_('Min valid sesnor measurment'):</label><div><input type=number id="min_valid_sensor_measurement" name="min_valid_sensor_measurement" value=""/><span name="sensor_units_txt"> $_('cm')</span></div>
+            <label>$_('Max valid sensor measurment'):</label><div><input type=number id="max_valid_sensor_measurement" name="max_valid_sensor_measurement" value=""/><span name="sensor_units_txt"> $_('cm')</span></div>
+            <label>$_('Sensor measurment'):</label><div><input type=number id="sensor_measurement" name="sensor_measurement" value=""readonly/><span name="sensor_units_txt"> $_('cm')</span></div>
             <label>$_('Invalid sensor measurement'):</label><div><img src="/static/images/warning-icon24x24.png" id="invalid_sensor_measurement" name="invalid_sensor_measurement" style="visibility:hidden"/></div>
             <label>$_('Last updated'):</label><div><input type=text id="last_updated" name="last_updated" value="" readonly/></div>
             <label>$_('Full %'):</label><div><input type=number id="percentage" name="percentage" value="" readonly/></div>
             <label>$_('Sensor Units'):</label>
             <fieldset class="one-col">
-                <label><input type="radio" name="sensor_units" value="1" hidden>$_('CENTIMETERS')</label>
-                <label><input type="radio" name="sensor_units" value="2" hidden>$_('METERS')</label>
-                <label><input type="radio" name="sensor_units" value="3" hidden>$_('INCHES')</label>
-                <label><input type="radio" name="sensor_units" value="4" hidden>$_('FEET')</label>
+                <label><input type="radio" name="sensor_units" value="1" hidden onclick="sensorUnitsSelected(LengthUnits.CENTIMETERS)">$_('CENTIMETERS')</label>
+                <label><input type="radio" name="sensor_units" value="2" hidden onclick="sensorUnitsSelected(LengthUnits.METERS)">$_('METERS')</label>
+                <label><input type="radio" name="sensor_units" value="3" hidden onclick="sensorUnitsSelected(LengthUnits.INCHES)">$_('INCHES')</label>
+                <label><input type="radio" name="sensor_units" value="4" hidden onclick="sensorUnitsSelected(LengthUnits.FEET)">$_('FEET')</label>
             </fieldset>
             <label>$_('Water Tank Units'):</label>
             <fieldset class="one-col">
-                <label><input type="radio" name="water_tank_units" value="1" hidden>$_('CENTIMETERS')</label>
-                <label><input type="radio" name="water_tank_units" value="2" hidden>$_('METERS')</label>
-                <label><input type="radio" name="water_tank_units" value="3" hidden>$_('INCHES')</label>
-                <label><input type="radio" name="water_tank_units" value="4" hidden>$_('FEET')</label>
+                <label><input type="radio" name="water_tank_units" value="1" hidden onclick="waterTankUnitsSelected(LengthUnits.CENTIMETERS)">$_('CENTIMETERS')</label>
+                <label><input type="radio" name="water_tank_units" value="2" hidden onclick="waterTankUnitsSelected(LengthUnits.METERS)">$_('METERS')</label>
+                <label><input type="radio" name="water_tank_units" value="3" hidden onclick="waterTankUnitsSelected(LengthUnits.INCHES)">$_('INCHES')</label>
+                <label><input type="radio" name="water_tank_units" value="4" hidden onclick="waterTankUnitsSelected(LengthUnits.FEET)">$_('FEET')</label>
             </fieldset>
             <label>$_('Enabled'):</label><div><input type="checkbox" id="enabled" name="enabled"/></div>
             <label>$_('Notify for invalid measurements'):</label><div style="display:flex; flex-wrap: wrap;">
