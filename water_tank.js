@@ -1,6 +1,40 @@
 $(document).ready(function() {
   //
   // get all water tank info for initial setup
+  var water_tanks = null;
+  var water_tank_settings = null;
+
+  setInterval(updateLastSensorUpdate, 1000);
+
+  function updateLastSensorUpdate()
+  {
+    if( water_tanks == null || water_tank_settings == null)
+    {
+      return; // no data has come in yet
+    }
+
+    Object.keys(water_tanks).forEach(e => {
+      // console.log(`key= $${e} value=$${water_tanks[e]}`);
+      const id = e;
+      const water_tank = water_tanks[e];
+      const time_passed_str = get_time_passed_str(water_tank.last_updated);
+      const exceeded = get_exceeded_4_dead_sensor(water_tank);
+      $(`#${water_tank.id}_last_updated`).text(time_passed_str);
+      if( exceeded.length == 0 )
+      {
+        $(`#${water_tank.id}_last_updated`).removeClass('exceeded');
+      }
+      else
+      {
+        $(`#${water_tank.id}_last_updated`).addClass('exceeded');
+      }
+    });
+  }
+
+  function get_exceeded_4_dead_sensor(water_tank)
+  {
+    return (Date.now() - new Date(water_tank.last_updated)) > water_tank_settings.max_sensor_no_signal_time*1000 ? "exceeded" : "";
+  }
 
   function get_whole_values(base_value, time_fractions) {
     time_data = [base_value];
@@ -10,15 +44,9 @@ $(document).ready(function() {
     }; return time_data;
   };
 
-  function template(water_tank, state="" )
+  function get_time_passed_str(last_updated)
   {
-    // console.log(`Will generate tr for id: ${water_tank.id}, label: ${water_tank.label}, percentage: ${water_tank.percentage}, sensor_error: ${water_tank.invalid_sensor_measurement}, last_updated: ${water_tank.last_updated}, state: "${state}"`);
-    let str_percentage = "";
-    let width_percentage = 0;
-    let last_updated = water_tank.last_updated;
-    // console.log("date last update:", last_updated);
-    
-    const time_passed = get_whole_values(Date.now() - new Date(water_tank.last_updated), [1000,  60, 60, 24]);
+    const time_passed = get_whole_values(Date.now() - new Date(last_updated), [1000,  60, 60, 24]);
     // console.log("time_passed: ", time_passed);
     let time_passed_str = "";
     if(time_passed[4]>0)
@@ -29,13 +57,41 @@ $(document).ready(function() {
     {
       time_passed_str += new String(time_passed[3]).padStart(2,0) + "h ";
     }
-    time_passed_str += (new String(time_passed[2]).padStart(2,0)) + "m ago";
+    time_passed_str += (new String(time_passed[2]).padStart(2,0)) + "m";
+    time_passed_str += " " + (new String(time_passed[1]).padStart(2,0)) + "s";
+    time_passed_str += " ago";
+
+    return time_passed_str;
+  }
+
+  function template(water_tank, state="" )
+  {
+    // console.log(`Will generate tr for id: ${water_tank.id}, label: ${water_tank.label}, percentage: ${water_tank.percentage}, sensor_error: ${water_tank.invalid_sensor_measurement}, last_updated: ${water_tank.last_updated}, state: "${state}"`);
+    let str_percentage = "";
+    let width_percentage = 0;
+    // let last_updated = water_tank.last_updated;
+    // console.log("date last update:", last_updated);
+    
+    // const time_passed = get_whole_values(Date.now() - new Date(water_tank.last_updated), [1000,  60, 60, 24]);
+    // // console.log("time_passed: ", time_passed);
+    // let time_passed_str = "";
+    // if(time_passed[4]>0)
+    // {
+    //   time_passed_str = time_passed[4] + "d ";
+    // }
+    // if(time_passed[3]>0)
+    // {
+    //   time_passed_str += new String(time_passed[3]).padStart(2,0) + "h ";
+    // }
+    // time_passed_str += (new String(time_passed[2]).padStart(2,0)) + "m ago";
+    const time_passed_str = get_time_passed_str(water_tank.last_updated);
     // console.log(time_passed_str);
 
-    if(last_updated == null)
-    {
-      last_updated = "";
-    }
+    // redundant
+    // if(last_updated == null)
+    // {
+    //   last_updated = "";
+    // }
     if(water_tank.invalid_sensor_measurement)
     {
       state = "sensor_error";
@@ -48,16 +104,15 @@ $(document).ready(function() {
     }
     let hidden = !water_tank.enabled ? "hidden" : "";
     // console.log(`Water_tank_id:${water_tank.id}, enabled: ${water_tank.enabled}, hidden:${hidden}`);
-    var water_tank_settings = null;
 
-    // I need to synchronously fetch the water_tank plugin settings to get the max_station_no_signal_mins
+    // I need to synchronously fetch the water_tank plugin settings to get the max_station_no_signal_time
     // since jQuery.getJson uses ajax configuration  just set the global ajax configs
     // from https://stackoverflow.com/a/23057124
     $.ajaxSetup({
       async: false
     });
     
-    // Your $.getJSON() request is now synchronous...
+    // The $.getJSON() request is now synchronous...
     $.getJSON('water_tank_get_settings_json', function(data)
     {
       water_tank_settings = data;
@@ -71,13 +126,14 @@ $(document).ready(function() {
     
     // console.log("water_tank_settings: ", water_tank_settings);
     // console.log("Time passed millis: " + (Date.now() - new Date(water_tank.last_updated)));
-    // console.log("max_sensor_no_signal_mins in millis: " + water_tank_settings.max_sensor_no_signal_mins);
-    const exceeded = (Date.now() - new Date(water_tank.last_updated)) > water_tank_settings.max_sensor_no_signal_mins*60000 ? "exceeded" : "";
+    // console.log("max_sensor_no_signal_time in millis: " + water_tank_settings.max_sensor_no_signal_time);
+    // const exceeded = (Date.now() - new Date(water_tank.last_updated)) > water_tank_settings.max_sensor_no_signal_time*60000 ? "exceeded" : "";
+    const exceeded = get_exceeded_4_dead_sensor(water_tank);
     // console.log( "exceeded: " + exceeded);
     return `<tr id="${water_tank.id}" ${hidden}>
       <td style="white-space: nowrap;">
         <div class="water-tank-label">${water_tank.label}</div>
-        <div class="last_updated ${exceeded}">${time_passed_str}</div>
+        <div id="${water_tank.id}_last_updated" class="last_updated ${exceeded}">${time_passed_str}</div>
       </td>
       <td style="width:100%">
         <div style="width: 100%;
@@ -121,7 +177,7 @@ $(document).ready(function() {
   if(url_parts[url_parts.length-1].length == 0)
   {
     $.getJSON('water-tank-get-all', function(data){
-      
+      water_tanks = data;
       // Add the new div right after the "options" div
       if(data.length > 1)
       {        
@@ -181,12 +237,12 @@ $(document).ready(function() {
       // console.log("onMessageArrived:"+message.payloadString);
       try
       {
-        const water_tanks = JSON.parse(message.payloadString);
+        water_tanks = JSON.parse(message.payloadString);
         Object.keys(water_tanks).forEach(e => {
             // console.log(`key= $${e} value=$${water_tanks[e]}`);
             const id = e;
             const water_tank = water_tanks[e];
-            // console.log('id: ' + id + ", water_tank: ", water_tank);
+            // console.log('id: ' + id + ", last_updated: " + water_tank.last_updated);
             
             if(water_tank.invalid_sensor_measurement)
             {

@@ -7,7 +7,7 @@ from threading import Thread
 from time import sleep
 import os
 from enum import IntEnum
-from datetime import datetime
+from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
 from math import acos, pi, sqrt
 import xmpp
@@ -17,6 +17,8 @@ import traceback # for exception debugging
 import ast      # for logging
 import io       # for logging
 import codecs   # for logging
+import threading as th # for timing dead sensors
+import time # for timing dead sensors
 
 # local module imports
 from blinker import signal
@@ -992,6 +994,29 @@ class MessageSender():
             if( self.water_tank.loss_email ):
                 email_send_msg( msg, "Water Loss" )
 
+    def DeadSensorDetected(self):
+        settings = get_settings()
+        if( self.water_tank.sensor_id is not None 
+            and self.water_tank.last_updated is not None 
+            and (settings[DEAD_SENSOR_EMAIL] or settings[DEAD_SENSOR_XMPP])
+        ):
+            print("Will send dead-sensor message")
+            msg = settings[DEAD_SENSOR_MSG].format(
+                water_tank_id = self.water_tank.id,
+                water_tank_label = self.water_tank.label,
+                sensor_id = self.water_tank.sensor_id,
+                percentage = self.water_tank.percentage,
+                measurement = self.water_tank.sensor_measurement,
+                last_updated = self.water_tank.last_updated,
+                mqtt_topic = self.water_tank.sensor_mqtt_topic,
+                additional_info = self.water_tank.AdditionalInfo4Msg()
+            )
+            print("Dead-sensor email:{}, xmpp:{}".format(settings[DEAD_SENSOR_EMAIL], settings[DEAD_SENSOR_XMPP]))
+            if( settings[DEAD_SENSOR_XMPP] ):
+                xmpp_send_msg( msg )
+            if( settings[DEAD_SENSOR_EMAIL] ):
+                email_send_msg( msg, "Dead Sensor" )
+
 
 ### Station Completed ###
 def notify_zone_change(name, **kw):
@@ -1028,12 +1053,16 @@ running_program_change.connect(notify_running_program_change)
 
 DATA_FILE = u"./data/water_tank.json"
 LOG_FILE = u"./data/water_tank.sensor_log.json"
+MQTT_BROKER_WS_PORT = u"mqtt_broker_ws_port"
 WATER_PLUGIN_REQUEST_MQTT_TOPIC = u"request_subscribe_mqtt_topic"
 WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC = u"data_publish_mqtt_topic"
 MAX_STATION_DURATION = "max_station_duration"
-MAX_SENSOR_NO_SIGNAL_MINS = "max_sensor_no_signal_mins"
+MAX_SENSOR_NO_SIGNAL_TIME = "max_sensor_no_signal_time"
 MAX_SENSOR_LOG_RECORDS = "max_sensor_log_records"
 SENSOR_LOG_ENABLED = "sensor_log_enabled"
+DEAD_SENSOR_EMAIL = "dead_sensor_email"
+DEAD_SENSOR_XMPP = "dead_sensor_xmpp"
+DEAD_SENSOR_MSG = "dead_sensor_msg"
 XMPP_USERNAME = u"xmpp_username"
 XMPP_PASSWORD = u"xmpp_password"
 XMPP_SERVER = u"xmpp_server"
@@ -1060,13 +1089,16 @@ XMPP_CRITICAL_MSG = u"xmpp_critical_msg"
 XMPP_WATER_LOSS_MSG = u"water_loss_msg"
 xmpp_msg_placeholders = ["water_tank_id", "water_tank_label", "sensor_id", "measurement", "last_updated", "mqtt_topic"]
 _settings = {
-    u"mqtt_broker_ws_port": 8080,
+    MQTT_BROKER_WS_PORT: 8080,
     WATER_PLUGIN_REQUEST_MQTT_TOPIC: "WaterTankDataRequest",
     WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC: "WaterTankData",
     MAX_STATION_DURATION: 60,
-    MAX_SENSOR_NO_SIGNAL_MINS: 10,
+    MAX_SENSOR_NO_SIGNAL_TIME: 10,
     MAX_SENSOR_LOG_RECORDS: 1000,
     SENSOR_LOG_ENABLED: True,
+    DEAD_SENSOR_EMAIL: True,
+    DEAD_SENSOR_XMPP: True,
+    DEAD_SENSOR_MSG: u"Sensor '{sensor_id}' of water tank '{water_tank_label}' ('water_tank_id: {water_tank_id}') may be dead. Last update was on '{last_updated}'. Listening for sensor messages on MQTT topic:'{mqtt_topic}'.",
     XMPP_USERNAME: "ahat_sip@ahat1.duckdns.org",
     XMPP_PASSWORD: u"312ggp12",
     XMPP_SERVER: u"ahat1.duckdns.org",
@@ -1340,6 +1372,7 @@ _settings = {
 
 
 defaults = {
+    DEAD_SENSOR_MSG: u"Sensor '{sensor_id}' of water tank '{water_tank_label}' ('water_tank_id: {water_tank_id}') may be dead. Last update was on '{last_updated}'. Listening for sensor messages on MQTT topic:'{mqtt_topic}'. Additional info:[{additional_info}]",
     UNRECOGNISED_MSG: u"Unrecognised mqtt msg! MQTT topic:'{mqtt_topic}', date:'{date}', msg:[{message}]",
     UNRECOGNISED_MSG_EMAIL: True,
     UNRECOGNISED_MSG_XMPP: True,
@@ -1380,7 +1413,7 @@ gv.plugin_menu.append([_(u"Water Tank Plugin"), u"/water-tank-sp"])
 def serialize_datetime(obj): 
     # print('Serializing: {}'.format(obj))
     if isinstance(obj, datetime): 
-        return obj.isoformat(sep=' ', timespec='minutes')
+        return obj.isoformat(sep=' ', timespec='seconds')
     elif isinstance(obj, WaterTankType):
         return obj.value
     elif isinstance(obj, WaterTankState):
@@ -1810,12 +1843,18 @@ class save_settings(ProtectedPage):
         )  # Dictionary of values returned as query string from settings page.
         print('Received: {}'.format(json.dumps(d, default=serialize_datetime, indent=4, sort_keys=True))) # for testing
         settings = get_settings()
-        settings[u"mqtt_broker_ws_port"] = d[u"mqtt_broker_ws_port"]
+
+        previous_MAX_SENSOR_NO_SIGNAL_TIME = settings[MAX_SENSOR_NO_SIGNAL_TIME]
+
+        settings[MQTT_BROKER_WS_PORT] = d[MQTT_BROKER_WS_PORT]
         settings[WATER_PLUGIN_REQUEST_MQTT_TOPIC] = d[WATER_PLUGIN_REQUEST_MQTT_TOPIC]
         settings[WATER_PLUGIN_REQUEST_MQTT_TOPIC] = d[WATER_PLUGIN_REQUEST_MQTT_TOPIC]
-        settings[MAX_SENSOR_NO_SIGNAL_MINS] = int(d[MAX_SENSOR_NO_SIGNAL_MINS])
+        settings[MAX_SENSOR_NO_SIGNAL_TIME] = int(d[MAX_SENSOR_NO_SIGNAL_TIME])
         settings[MAX_SENSOR_LOG_RECORDS] = int(d[MAX_SENSOR_LOG_RECORDS])
         settings[SENSOR_LOG_ENABLED] = (SENSOR_LOG_ENABLED in d)
+        settings[DEAD_SENSOR_EMAIL] = (DEAD_SENSOR_EMAIL in d)
+        settings[DEAD_SENSOR_XMPP] = (DEAD_SENSOR_XMPP in d)
+        settings[DEAD_SENSOR_MSG] = d[DEAD_SENSOR_MSG]
         settings[MAX_STATION_DURATION] = int(d[MAX_STATION_DURATION])
         settings[XMPP_USERNAME] = d[XMPP_USERNAME]
         settings[XMPP_PASSWORD] = d[XMPP_PASSWORD]
@@ -1843,6 +1882,10 @@ class save_settings(ProtectedPage):
         with open(DATA_FILE, u"w") as f:
             json.dump(settings, f, default=serialize_datetime, indent=4)  # save to file
         # print('Saved settings: {}'.format(json.dumps(settings, default=serialize_datetime, indent=4)))
+
+        # if the max-no-signal time has changed restart the dead-sensor monitor
+        if( previous_MAX_SENSOR_NO_SIGNAL_TIME != settings[MAX_SENSOR_NO_SIGNAL_TIME] ):
+            dead_sensor_monitor.reset(settings[MAX_SENSOR_NO_SIGNAL_TIME])
 
         raise web.seeother(u"/water-tank-sp?showSettings") 
 
@@ -1917,7 +1960,7 @@ class get_mqtt_settings(ProtectedPage):
     def GET(self):
         water_tank_settings = get_settings()
         settings = mqtt.get_settings()
-        settings[u"mqtt_broker_ws_port"] = int(water_tank_settings[u"mqtt_broker_ws_port"])
+        settings[MQTT_BROKER_WS_PORT] = int(water_tank_settings[MQTT_BROKER_WS_PORT])
         settings[WATER_PLUGIN_REQUEST_MQTT_TOPIC] = water_tank_settings[WATER_PLUGIN_REQUEST_MQTT_TOPIC]
         settings[WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC] = water_tank_settings[WATER_PLUGIN_DATA_PUBLISH_MQTT_TOPIC]
         # Get the ip in case of localhost or 127.0.0.1
@@ -2051,7 +2094,55 @@ class csv_sensor_log(ProtectedPage):
         web.header("Content-Type", "text/csv")
         return data
 
+
+class DeadSensorMonitor(th.Thread):
+    def __init__(self, interval_seconds):
+        self.interval_seconds = interval_seconds
+        # init last_check_time with yesterday's datetime to ensure first check at start
+        self.last_check_time = datetime.now() - timedelta(days=1)    
+        self._timer_runs = th.Event()
+        self._timer_runs.set()
+        super().__init__()
+
+    def run(self):
+        # NOTE: if a sensor sends a message and then dies it will not be detected at the 
+        # first check. This is because the timer was already running and by the time it 
+        # expires the sensor will not be considered dead. The sensor will be considered
+        # dead the next time the timer expires
+        while self._timer_runs.is_set():
+            now = datetime.now()
+            # print("Time passed {} secs".format((now - self.last_check_time).total_seconds()))
+            if( (now - self.last_check_time).total_seconds() > self.interval_seconds ):
+                self.last_check_time = now
+                self.check_dead_sensors()
+                print("DeadSensorMonitor no check for the next {} seconds".format(self.interval_seconds))
+            time.sleep(1)
+
+    def stop(self):
+        self._timer_runs.clear()
+
+    def reset(self, interval_seconds):
+        print("DeadSensorMonitor reset interval_seconds to {}".format(interval_seconds))
+        self.interval_seconds = interval_seconds
+
+    def check_dead_sensors(self):
+        print("DeadSensorMonitor.check_dead_sensors()")
+        settings = get_settings()
+        for wtd in settings[u"water_tanks"].values():
+            wt = WaterTankFactory.FromDict(wtd)
+            dateDiff = datetime.now() - datetime.fromisoformat(wt.last_updated)
+            if( dateDiff.total_seconds() < settings[MAX_SENSOR_NO_SIGNAL_TIME] ):
+                continue
+            
+            msgSender = MessageSender(None, wt)
+            msgSender.DeadSensorDetected()
+            
+
+
 #  Run when plugin is loaded
 detect_water_tank_js() # add water_tank.js to base.html if ncessary
 load_programs() # in order to load program names in gv.pnames
 subscribe_mqtt()
+
+dead_sensor_monitor = DeadSensorMonitor(get_settings()[MAX_SENSOR_NO_SIGNAL_TIME])
+dead_sensor_monitor.start()
