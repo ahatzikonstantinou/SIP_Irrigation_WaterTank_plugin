@@ -85,8 +85,30 @@ form.water-tank input{
 }    
 
 .water-tank span.flash-event {
-    -webkit-animation: water-tank-event 1s step-end infinite;    
-    animation: water-tank-event 1s step-end infinite;  
+    -webkit-animation: water-tank-event 2s step-end infinite;    
+    animation: water-tank-event 2s step-end infinite;  
+}
+
+@-webkit-keyframes water-tank-sensor-warning {    
+    from, to {    
+        color: transparent    
+    }    
+    20% {    
+        color: #dd0000
+    }    
+}    
+@keyframes water-tank-sensor-warning {    
+    from, to {    
+        color: transparent    
+    }    
+    20% {    
+        color: #dd0000
+    }   
+}    
+
+.water-tank span.flash-sensor-warning {
+    -webkit-animation: water-tank-sensor-warning 2s step-end infinite;    
+    animation: water-tank-sensor-warning 2s step-end infinite;  
 }
 
 .water-tank table{
@@ -263,7 +285,7 @@ form.water-tank input{
     from, to {    
         color: transparent    
     }    
-    15% {    
+    20% {    
         color: #c00;    
     }    
 }    
@@ -271,14 +293,14 @@ form.water-tank input{
     from, to {    
         color: transparent    
     }    
-    15% {    
+    20% {    
         color: #c00;    
     }    
 }    
 
 #water_tank_table .last_updated.exceeded {        
-    -webkit-animation: last_updated_exceeded 1s step-end infinite;    
-    animation: last_updated_exceeded 3s step-end infinite;    
+    -webkit-animation: last_updated_exceeded 2s step-end infinite;    
+    animation: last_updated_exceeded 2s step-end infinite;    
 }
 
 #water_tank_table .last_updated {

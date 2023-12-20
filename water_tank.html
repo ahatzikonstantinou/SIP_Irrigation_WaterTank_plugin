@@ -158,34 +158,46 @@ function getWaterTankStateName(stateValue)
                 //console.log("onMessageArrived:"+message.payloadString);
                 try
                 {
-                    const water_tanks = JSON.parse(message.payloadString);
-                    console.log('Received MQTT message:', water_tanks);  
-                    Object.keys(water_tanks).forEach(e => {
-                        console.log(`key= $${e} value=$${water_tanks[e]}`);
+                    water_tank_data = JSON.parse(message.payloadString);
+                    console.log('Received MQTT message:', water_tank_data);  
+                    Object.keys(water_tank_data).forEach(e => {
+                        console.log(`key= $${e} value=$${water_tank_data[e]}`);
                         const id = e;
-                        const water_tank = water_tanks[e];
+                        const water_tank = water_tank_data[e];
                         console.log('id: ' + id + ", water_tank: ", water_tank);
+
+                        // update the rows in the water tanks table
                         let td = jQuery("td").filter(function() {
-                            return $$(this).text() === id;
+                            return jQuery(this).text() === water_tank.id;
                         });
-                        //console.log('td: ', td.text());
+                        // console.log('td: ', td.text());
                         td.removeClass();
                         td.addClass(DetermineWaterTankState(water_tank));
                         if(water_tank.percentage != null)
                         {
                             td.nextAll().eq(1).text(Math.round(water_tank.percentage)+"%");
-                            td.nextAll().eq(2).text(water_tank.last_updated);
                         }
+                        else
+                        {
+                            td.nextAll().eq(1).text("");
+                        }
+                        td.nextAll().eq(2).text(water_tank.last_updated);                      
 
-                        jQuery("#last_updated").val(water_tank.last_updated);
-                        jQuery("#invalid_sensor_measurement").css({ visibility: (water_tank.invalid_sensor_measurement? "visible" : "hidden")});
-                        jQuery("#percentage").val(water_tank.percentage != null ? Math.round(water_tank.percentage) : "");
-
-                        console.log("Checking whether to flash a state original_id:" +
+                        console.log("Checking whether to update fields and flash a state original_id:" +
                             jQuery("#original_water_tank_id").val() +
                             ", against id: " + water_tank.id);
                         if(jQuery("#original_water_tank_id").val() == water_tank.id)
                         {
+                            // update the form fields if this is the selected water-tank whose fields 
+                            // are currently loaded in the form
+                            jQuery("#last_updated").val(water_tank.last_updated);
+                            jQuery("#invalid_sensor_measurement").css({ visibility: (water_tank.invalid_sensor_measurement? "visible" : "hidden")});
+                            jQuery("#sensor_measurement").val(water_tank.sensor_measurement);
+                            jQuery("#sensor_warning").text(water_tank.sensor_warning);
+                            // jQuery("#percentage").val(Math.round(water_tank.percentage));
+                            jQuery("#percentage").val(water_tank.percentage != null ? Math.round(water_tank.percentage) : "");
+
+                            // flash current state
                             if([WaterTankState.OVERFLOW, WaterTankState.OVERFLOW_UNSAFE].includes(water_tank.state))
                             {
                                 console.log("Flashing OVERFLOW");
@@ -262,7 +274,7 @@ function getWaterTankStateName(stateValue)
                
         jQuery.validator.addMethod("messageRule", function(value, element) {
             let keywords = value.match(/{(.*?)}/g);    // capture all words between curly brackets, will include the curly brackets
-            let allowedKeywords = ["water_tank_id", "water_tank_label", "sensor_id", "percentage", "measurement", "last_updated", "mqtt_topic", "additional_info"];
+            let allowedKeywords = ["water_tank_id", "water_tank_label", "sensor_id", "percentage", "measurement", "last_updated", "mqtt_topic", "additional_info", "sensor_warning"];
             
             let excludeKeywordsStr = jQuery("#"+element.id).data("exclude-keywords");            
             let excludeKeywords = [];
@@ -426,9 +438,13 @@ function getWaterTankStateName(stateValue)
         jQuery("#invalid_sensor_measurement_xmpp").prop('checked', water_tank.invalid_sensor_measurement_xmpp);
         jQuery("#sensor_id").val(water_tank.sensor_id);
         jQuery("#sensor_offset_from_top").val(water_tank.sensor_offset_from_top);
+        jQuery("#max_sensor_no_signal_time").val(water_tank.max_sensor_no_signal_time);
         jQuery("#min_valid_sensor_measurement").val(water_tank.min_valid_sensor_measurement);
         jQuery("#max_valid_sensor_measurement").val(water_tank.max_valid_sensor_measurement);
         jQuery("#sensor_measurement").val(water_tank.sensor_measurement);
+        jQuery("#sensor_warning").text(water_tank.sensor_warning);
+        jQuery("#sensor_warning_email").prop('checked', water_tank.sensor_warning_email);
+        jQuery("#sensor_warning_xmpp").prop('checked', water_tank.sensor_warning_xmpp); 
         jQuery("#last_updated").val(water_tank.last_updated);
         jQuery("#invalid_sensor_measurement").css({ visibility: (water_tank.invalid_sensor_measurement? "visible" : "hidden")});
         jQuery("#percentage").val(Math.round(water_tank.percentage));
@@ -624,7 +640,6 @@ function getWaterTankStateName(stateValue)
             // console.log("Unchecked " + '#'+state+'_pr_run_$i');
     }    
 
-
 const LengthUnits = {
     CENTIMETERS : 1,
     METERS : 2,
@@ -655,6 +670,7 @@ function sensorUnitsSelected(units)
     }
     jQuery("[name='sensor_units_txt']").text(txt);
 }
+
 function waterTankUnitsSelected(units)
 {
     let txt = getUnitsText(units);
@@ -685,7 +701,6 @@ function waterTankUnitsSelected(units)
                 <p class="info">$_('If a sensor has not sent a signal within the specified "no signal" minutes, SIP will flash the time-passed since last update under the water tank\'s name in the hompegage. In addition a message will be sent via email and/or xmpp (see "Dead-Sensor message" in messages).')</p> 
                 <p class="info">$_('SIP will keep only the newest max sensor log records in the sensors log.')</p>
                 <fieldset class="two-col">
-                    <label>$_('Max Sensor No Signal (seconds)'):</label><input type="number" id="max_sensor_no_signal_time" name="max_sensor_no_signal_time" min="0" value="$settings['max_sensor_no_signal_time']" required/>
                     <label>$_('Max Sensor Log Records'):</label><input type="number" id="max_sensor_log_records" name="max_sensor_log_records" min="0" value="$settings['max_sensor_log_records']" required/>
                     <label>$_('Enable Sensor Logging')</label><input id="sensor_log_enabled" name="sensor_log_enabled" type="checkbox" ${'checked=checked' if settings['sensor_log_enabled'] else ''}/>
                 </fieldset>
@@ -726,13 +741,14 @@ function waterTankUnitsSelected(units)
                 <p class="info">$_('For overflow, warning, and critical events messages will be resent only after the water level has crossed back over the event level. The list of allowed keywords that will be replaced by the corresponding values is: {water_tank_id}, {water_tank_label}, {sensor_id}, {percentage}, {measurement}, {last_updated}, {mqtt_topic}, {additional_info}. Keywords must be enclosed in curly brackets.')</p>
                 <p class="info">$_('Keywords {water_tank_id},{water_tank_label},{percentage},{additional_info} are not valid for field "Unassociated-Sensor" message.')</p>
                 <p class="info">$_('For field Unrecognised message valid are only keywords {mqtt_topic}, {date}, and {message}')</p>
+                <p class="info">$_('For field Dead-Sensor message valid are only keywords {sensor_id}, {water_tank_id}, {water_tank_label}, {last_updated}, and {mqtt_topic}')</p>
                 <fieldset class="two-col">
                     <div>
                         <label>$_('Unrecognised message'):</label>
                         <button type="button" class="reset" onclick='jQuery("#unrecognised_msg").val(defaults.unrecognised_msg);'>$_('reset')</button>
                     </div>
                     <div>
-                        <textarea id="unrecognised_msg" name="unrecognised_msg" data-exclude-keywords="water_tank_id,water_tank_label,sensor_id,percentage,measurement,last_updated,additional_info" data-extra-keywords="date,message">$settings['unrecognised_msg']</textarea>
+                        <textarea id="unrecognised_msg" name="unrecognised_msg" data-exclude-keywords="water_tank_id,water_tank_label,sensor_id,percentage,measurement,last_updated,additional_info,sensor_warning" data-extra-keywords="date,message">$settings['unrecognised_msg']</textarea>
                     </div>
 
                     <label>$_('Notify for unrecognised message')</label><div style="display:flex; flex-wrap: wrap;">
@@ -745,11 +761,19 @@ function waterTankUnitsSelected(units)
                         <button type="button" class="reset" onclick='jQuery("#dead_sensor_msg").val(defaults.dead_sensor_msg);'>$_('reset')</button>
                     </div>
                     <div>
-                        <textarea id="dead_sensor_msg" name="dead_sensor_msg">$settings['dead_sensor_msg']</textarea>
+                        <textarea id="dead_sensor_msg" name="dead_sensor_msg" data-exclude-keywords="percentage,measurement,additional_info,sensor_warning">$settings['dead_sensor_msg']</textarea>
                     </div>
                     <label>$_('Notify for dead sensors')</label><div style="display:flex; flex-wrap: wrap;">
                         <label>Email<input id="dead_sensor_email" name="dead_sensor_email" type="checkbox" ${'checked=checked' if settings['dead_sensor_email'] else ''}/></label>
                         <label>Xmpp<input id="dead_sensor_xmpp" name="dead_sensor_xmpp" type="checkbox" ${'checked=checked' if settings['dead_sensor_xmpp'] else ''}/></label>
+                    </div>
+                    
+                    <div>
+                        <label>$_('Sensor-Warning message'):</label>
+                        <button type="button" class="reset" onclick='jQuery("#sensor_warning_msg").val(defaults.sensor_warning_msg);'>$_('reset')</button>
+                    </div>
+                    <div>
+                        <textarea id="sensor_warning_msg" name="sensor_warning_msg">$settings['sensor_warning_msg']</textarea>
                     </div>
 
                     <div>
@@ -845,6 +869,7 @@ function waterTankUnitsSelected(units)
         </table>
 
         <h4>$_('Water Tank Details')</h4>
+        <p class="info">$_('Disable a water tank to hide it from the homepage, stop activating/reverting programs and stations on state change, and stop sending notificaton messages.')</p>
         <input type="hidden" id="original_water_tank_id" name="original_water_tank_id" value=""/>
         <input type="hidden" id="action" name="action" value="add"/>
         <fieldset class="two-col">
@@ -857,21 +882,27 @@ function waterTankUnitsSelected(units)
                 <label><input type="radio" name="type" value="3" hidden onClick="typeSelected(3)">$_('CYLINDRICAL_VERTICAL')</label>
                 <label><input type="radio" name="type" value="4" hidden onClick="typeSelected(4)">$_('ELLIPTICAL')</label>
             </fieldset>
-            <label>$_('Width'):</label><div><input type=number min=0 id="width" name="width" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
-            <label>$_('Length'):</label><div><input type=number min=0 id="length" name="length" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
-            <label>$_('Diameter'):</label><div><input type=number min=0 id="diameter" name="diameter" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
-            <label>$_('Height'):</label><div><input type=number min=0 id="height" name="height" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
-            <label>$_('Horizontal Axis'):</label><div><input type=number min=0 id="horizontal_axis" name="horizontal_axis" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
-            <label>$_('Vertical Axis'):</label><div><input type=number min=0 id="vertical_axis" name="vertical_axis" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
-            <label>$_('Sensor Mqtt Topic'):</label><div><input type=text id="sensor_mqtt_topic" name="sensor_mqtt_topic" value=""/></div>
-            <label>$_('Sensor ID'):</label><div><input type=text id="sensor_id" name="sensor_id" required/></div>
-            <label>$_('Sensor offset from top'):</label><div><input type=number id="sensor_offset_from_top" name="sensor_offset_from_top" value="0.0" required/><span name="water_tank_units_txt">$_('cm')</span></div>
-            <label>$_('Min valid sesnor measurment'):</label><div><input type=number id="min_valid_sensor_measurement" name="min_valid_sensor_measurement" value=""/><span name="sensor_units_txt"> $_('cm')</span></div>
-            <label>$_('Max valid sensor measurment'):</label><div><input type=number id="max_valid_sensor_measurement" name="max_valid_sensor_measurement" value=""/><span name="sensor_units_txt"> $_('cm')</span></div>
-            <label>$_('Sensor measurment'):</label><div><input type=number id="sensor_measurement" name="sensor_measurement" value=""readonly/><span name="sensor_units_txt"> $_('cm')</span></div>
+            <label>$_('Width'):</label><div><input type="number" min=0 id="width" name="width" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Length'):</label><div><input type="number" min=0 id="length" name="length" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Diameter'):</label><div><input type="number" min=0 id="diameter" name="diameter" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Height'):</label><div><input type="number" min=0 id="height" name="height" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Horizontal Axis'):</label><div><input type="number" min=0 id="horizontal_axis" name="horizontal_axis" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Vertical Axis'):</label><div><input type="number" min=0 id="vertical_axis" name="vertical_axis" value=""/><span name="water_tank_units_txt"> $_('cm')</span></div>
+            <label>$_('Sensor Mqtt Topic'):</label><div><input type="text" id="sensor_mqtt_topic" name="sensor_mqtt_topic" value=""/></div>
+            <label>$_('Sensor ID'):</label><div><input type="text" id="sensor_id" name="sensor_id" required/></div>
+            <label>$_('Sensor offset from top'):</label><div><input type="number" id="sensor_offset_from_top" name="sensor_offset_from_top" value="0.0" required/><span name="water_tank_units_txt">$_('cm')</span></div>
+            <label>$_('Max Sensor No Signal (seconds)'):</label><div><input type="number" id="max_sensor_no_signal_time" name="max_sensor_no_signal_time" min="0" required/></div>
+            <label>$_('Min valid sesnor measurment'):</label><div><input type="number" id="min_valid_sensor_measurement" name="min_valid_sensor_measurement" value=""/><span name="sensor_units_txt"> $_('cm')</span></div>
+            <label>$_('Max valid sensor measurment'):</label><div><input type="number" id="max_valid_sensor_measurement" name="max_valid_sensor_measurement" value=""/><span name="sensor_units_txt"> $_('cm')</span></div>
+            <label>$_('Sensor measurement'):</label><div><input type="number" id="sensor_measurement" name="sensor_measurement" value="" readonly/><span name="sensor_units_txt"> $_('cm')</span></div>
+            <label>$_('Sensor warning'):</label><div><span class="flash-sensor-warning" id="sensor_warning" name="sensor_warning"/></div>
+            <label>$_('Notify on sensor warning'):</label><div style="display:flex; flex-wrap: wrap;">
+                <label>Email<input id="sensor_warning_email" name="sensor_warning_email" type="checkbox"/></label>
+                <label>Xmpp<input id="sensor_warning_xmpp" name="sensor_warning_xmpp" type="checkbox"/></label>
+            </div>
             <label>$_('Invalid sensor measurement'):</label><div><img src="/static/images/warning-icon24x24.png" id="invalid_sensor_measurement" name="invalid_sensor_measurement" style="visibility:hidden"/></div>
-            <label>$_('Last updated'):</label><div><input type=text id="last_updated" name="last_updated" value="" readonly/></div>
-            <label>$_('Full %'):</label><div><input type=number id="percentage" name="percentage" value="" readonly/></div>
+            <label>$_('Last updated'):</label><div><input type="text" id="last_updated" name="last_updated" value="" readonly/></div>
+            <label>$_('Full %'):</label><div><input type="number" id="percentage" name="percentage" value="" readonly/></div>
             <label>$_('Sensor Units'):</label>
             <fieldset class="one-col">
                 <label><input type="radio" name="sensor_units" value="1" hidden onclick="sensorUnitsSelected(LengthUnits.CENTIMETERS)">$_('CENTIMETERS')</label>
@@ -912,8 +943,8 @@ function waterTankUnitsSelected(units)
 
         <div><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Overflow')</h4><span name="overflow_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <fieldset class="two-col">            
-            <label>$_('Overflow Level'):</label><div><input id="overflow_level" name="overflow_level" type=number min=0 max=100/></div>
-            <label>$_('Safe level'):</label><div><input id="overflow_safe_level" name="overflow_safe_level" type=number min=0 max=100/></div>
+            <label>$_('Overflow Level'):</label><div><input id="overflow_level" name="overflow_level" type="number" min=0 max=100/></div>
+            <label>$_('Safe level'):</label><div><input id="overflow_safe_level" name="overflow_safe_level" type="number" min=0 max=100/></div>
             <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
                 <label>Email<input id="overflow_email" name="overflow_email" type="checkbox"/></label>
                 <label>Xmpp<input id="overflow_xmpp" name="overflow_xmpp" type="checkbox"/></label>
@@ -953,8 +984,8 @@ function waterTankUnitsSelected(units)
 
         <div><span name="warning_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Warning')</h4><span name="warning_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <fieldset class="two-col">
-            <label>$_('Level'):</label><div><input id="warning_level" name="warning_level" type=number min=0 max=100/></div>
-            <label>$_('Safe level'):</label><div><input id="warning_safe_level" name="warning_safe_level" type=number min=0 max=100/></div>
+            <label>$_('Level'):</label><div><input id="warning_level" name="warning_level" type="number" min=0 max=100/></div>
+            <label>$_('Safe level'):</label><div><input id="warning_safe_level" name="warning_safe_level" type="number" min=0 max=100/></div>
             <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
                 <label>Email<input id="warning_email" name="warning_email" type="checkbox"/></label>
                 <label>Xmpp<input id="warning_xmpp" name="warning_xmpp" type="checkbox"/></label>
@@ -993,8 +1024,8 @@ function waterTankUnitsSelected(units)
 
         <div><span name="critical_flash" class="flash-event" hidden>&#x26A1;</span><h4>$_('Critical')</h4><span name="critical_flash" class="flash-event" hidden>&#x26A1;</span></div>
         <fieldset class="two-col">
-            <label>$_('Level'):</label><div><input id="critical_level" name="critical_level" type=number min=0 max=100/></div>
-            <label>$_('Safe level'):</label><div><input id="critical_safe_level" name="critical_safe_level" type=number min=0 max=100/></div>
+            <label>$_('Level'):</label><div><input id="critical_level" name="critical_level" type="number" min=0 max=100/></div>
+            <label>$_('Safe level'):</label><div><input id="critical_safe_level" name="critical_safe_level" type="number" min=0 max=100/></div>
             <label>$_('Notify'):</label><div style="display:flex; flex-wrap: wrap;">
                 <label>Email<input id="critical_email" name="critical_email" type="checkbox"/></label>
                 <label>Xmpp<input id="critical_xmpp" name="critical_xmpp" type="checkbox"/></label>

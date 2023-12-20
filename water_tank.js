@@ -33,7 +33,7 @@ $(document).ready(function() {
 
   function get_exceeded_4_dead_sensor(water_tank)
   {
-    return (Date.now() - new Date(water_tank.last_updated)) > water_tank_settings.max_sensor_no_signal_time*1000 ? "exceeded" : "";
+    return (Date.now() - new Date(water_tank.last_updated)) > water_tank.max_sensor_no_signal_time*1000 ? "exceeded" : "";
   }
 
   function get_whole_values(base_value, time_fractions) {
@@ -162,10 +162,10 @@ $(document).ready(function() {
 
 
   // Create a new div element
-  var many_water_tank_div = $(`<p style="padding-top:1em;">Water Tanks</p><div id="water_tank_container">
-    <table id="water_tank_table" style="width:100%;border: 1px solid #2E3959;border-radius: 12px;padding: 4px;">        
-    </table>
-  </div>`);
+  // var many_water_tank_div = $(`<p style="padding-top:1em;">Water Tanks</p><div id="water_tank_container">
+  //   <table id="water_tank_table" style="width:100%;border: 1px solid #2E3959;border-radius: 12px;padding: 4px;">        
+  //   </table>
+  // </div>`);
 
   var single_water_tank_div = $(`<div id="water_tank_container" style="padding-top:1em;">
     <table id="water_tank_table" style="width:100%;padding: 4px;">        
@@ -179,11 +179,14 @@ $(document).ready(function() {
     $.getJSON('water-tank-get-all', function(data){
       water_tanks = data;
       // Add the new div right after the "options" div
-      if(data.length > 1)
-      {        
-        $('#options').after(many_water_tank_div);
-      }
-      else
+      // if(data.length > 1)
+      // if(array.filter((obj) => obj.enabled).length > 1)
+      // console.log(Object.keys(data).map(function(key){return data[key];}));
+      // if(Object.keys(data).map(function(key){return data[key];}).filter((obj) => obj.enabled).length > 1)
+      // {        
+      //   $('#options').after(many_water_tank_div);
+      // }
+      // else
       {      
         $('#options').after(single_water_tank_div);
       }
