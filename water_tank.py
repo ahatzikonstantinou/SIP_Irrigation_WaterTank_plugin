@@ -319,7 +319,7 @@ class WaterTank(ABC):
         self.last_updated = None if 'last_updated' not in d else d["last_updated"]
         self.sensor_measurement = None if 'sensor_measurement' not in d else d["sensor_measurement"]
         self.invalid_sensor_measurement = None if 'invalid_sensor_measurement' not in d else d["invalid_sensor_measurement"]
-        self.percentage = None if 'percentage' not in d or d["percentage"] is None else float(d["percentage"])
+        self.percentage = None if 'percentage' not in d or d["percentage"] is None or not d["percentage"] else float(d["percentage"])
         self.order = None if "order" not in d else int( d["order"])
         self.state = None if "state" not in d or d["state"] is None or d["state"] == "null" else WaterTankState( int(d["state"]) )
 
