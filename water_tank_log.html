@@ -1,0 +1,93 @@
+$def with (records, settings)
+
+$var title: $_(u'SIP Water Tank, Sensors - Log')
+$var page: water_tank_log
+$code:
+	snames = gv.snames
+	if settings['sensor_log_enabled']:
+		log_state = _(u"Enabled")
+		log_option = "checked"
+	else:
+		log_state = _(u"Disabled")
+		log_option = ""
+		
+	def formatTime(t):
+		if gv.sd['tf']:
+			return t
+		else:
+			hour = int(t[0:2])
+			newhour = hour
+			if hour == 0:
+				newhour = 12
+			if hour > 12:
+				newhour = hour-12
+			return str(newhour) + t[2:] + (" am" if hour<12 else " pm")
+
+
+<script>
+    // Initialize behaviors
+    jQuery(document).ready(function(){
+        jQuery("button#nRefresh").click(function(){
+            window.location = "/water_plugin_sensor_log";
+        });
+        jQuery("button#nDeleteAll").click(function(){
+            jQuery("form#df").submit();
+        });
+        jQuery("button#nBackToPlugin").click(function(){
+            window.location = "/water-tank-sp";
+        });
+    });
+
+    var show_mqtt_topic = false;
+    function toggleMqttTopic()
+    {
+        if(jQuery("#show_mqtt_topic").is(':checked'))
+        {
+            jQuery("#mqtt_header, #mqtt_column").show();
+        }
+        else
+        {
+            jQuery("#mqtt_header, #mqtt_column").hide();
+        }
+    }
+</script>
+
+<div id="options">
+    <div class="title">$_(u'Water Tank PLugin - Sensors Log ')$log_state</div>
+    <form method="get" action="/water_plugin_clear_sensor_log" name="df" id="df"></form>
+</div>
+
+<div id="sensor-log">
+    <p>$_(u'Total number of records: ')${len(records)} (${_(u"no") if settings["max_sensor_log_records"] == 0 else settings["max_sensor_log_records"]}$_(u' limit'))</p>
+    <p>$_(u'Download log as ')<a href="/water_plugin_download_sensor_log">csv</a>.</p>
+    <p><label>$_(u'Show MQTT Topic.')<input id="show_mqtt_topic" type="checkbox" onclick="toggleMqttTopic()"/></label></p>
+
+    <table class="logList" style="text-align: left;">
+    	<thead>
+        <tr class="log_rec">
+            <th>$_(u'Date')</th>
+            <th id="mqtt_header" hidden>$_(u'MQTT Topic')</th>
+            <th>$_(u'MQTT Payload')</th>
+        </tr>
+        </thead>
+         
+        <tbody> 
+        $ odd = 1
+        $for r in records:
+            $ event = r #  ast.literal_eval(json.loads(r))
+            <tr class="log_rec ${'odd' if odd else 'even'}">
+                <td>${event["date"]}</td>
+                <td id="mqtt_column" hidden>${event["mqtt_topic"]}</td>
+                <td>${event["mqtt_payload"]}</td>
+            </tr>
+            $ odd = 1 - odd
+        </tbody>  
+    </table>
+
+</div>
+
+<div class="controls">
+    <button id="nRefresh" class="refresh">$_(u'Refresh')</button>
+    <button id="nDeleteAll" class="delete danger">$_(u'Clear Log')</button>
+    <button id="nBackToPlugin" class="execute">$_(u'Back to plugin')</button>
+</div>
