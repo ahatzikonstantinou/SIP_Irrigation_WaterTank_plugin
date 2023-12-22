@@ -11,6 +11,7 @@ Requirements: mqtt, xmpppy
 
 water_tank.py plugins
 water_tank.html templates
+water_tank_log.html templates
 water-tank-plugin-docs.html templates
 water_tank.css static/css
 water_tank.js static/scripts
