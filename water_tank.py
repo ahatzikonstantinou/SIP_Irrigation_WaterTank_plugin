@@ -1579,26 +1579,29 @@ def email_send_msg(text, tank_event):
     settings = get_settings()
     print("Sending email [{}] for tank event: {}, with subject: '{}'".format(text, tank_event,settings[EMAIL_SUBJECT]))
     
-    if settings[EMAIL_USERNAME] != "" and settings[EMAIL_PASSWORD] != "" and settings[EMAIL_SERVER] != "" and settings[EMAIL_SERVER_PORT] != "" and settings[EMAIL_RECIPIENTS] != "":
-        mail_user = settings[EMAIL_USERNAME]  # SMTP username
-        mail_from = mail_user
-        mail_pwd = settings[EMAIL_PASSWORD]  # SMTP password
-        mail_server = settings[EMAIL_SERVER]  # SMTP server address
-        mail_port = settings[EMAIL_SERVER_PORT]  # SMTP port
-        # --------------
-        msg = MIMEText(text)
-        msg[u"From"] = mail_from
-        msg[u"To"] = settings[EMAIL_RECIPIENTS]
-        # print("Sending email to: {}".format(msg[u"To"]))
-        msg[u"Subject"] = settings[EMAIL_SUBJECT] + " " + tank_event
-        
-        with smtplib.SMTP_SSL(mail_server, mail_port) as smtp_server:
-            smtp_server.login(mail_user, mail_pwd)
-            smtp_server.sendmail(mail_user, [x.strip() for x in settings[EMAIL_RECIPIENTS].split(',')], msg.as_string())
-        print("Message sent!")
-
-    else:
-        raise Exception(u"E-mail plug-in is not properly configured!")
+    try:  #put the code in a try catch or else the entire plugin will crash if for example the email password is wrong
+        if settings[EMAIL_USERNAME] != "" and settings[EMAIL_PASSWORD] != "" and settings[EMAIL_SERVER] != "" and settings[EMAIL_SERVER_PORT] != "" and settings[EMAIL_RECIPIENTS] != "":
+            mail_user = settings[EMAIL_USERNAME]  # SMTP username
+            mail_from = mail_user
+            mail_pwd = settings[EMAIL_PASSWORD]  # SMTP password
+            mail_server = settings[EMAIL_SERVER]  # SMTP server address
+            mail_port = settings[EMAIL_SERVER_PORT]  # SMTP port
+            # --------------
+            msg = MIMEText(text)
+            msg[u"From"] = mail_from
+            msg[u"To"] = settings[EMAIL_RECIPIENTS]
+            # print("Sending email to: {}".format(msg[u"To"]))
+            msg[u"Subject"] = settings[EMAIL_SUBJECT] + " " + tank_event
+            
+            with smtplib.SMTP_SSL(mail_server, mail_port) as smtp_server:
+                smtp_server.login(mail_user, mail_pwd)
+                smtp_server.sendmail(mail_user, [x.strip() for x in settings[EMAIL_RECIPIENTS].split(',')], msg.as_string())
+            print("Message sent!")
+        else:
+            raise Exception(u"E-mail plug-in is not properly configured!")
+    except Exception as e:
+        print("Could not send email.", e)
+        traceback.print_exc()
 
 
 def get_xmpp_receipients():
@@ -1614,79 +1617,95 @@ def get_xmpp_receipients():
 
 def xmpp_send_msg(message):
     # print("Will try to send message '{}'".format(message))
-    settings = get_settings()
+    try:    #put the code inside a try except because if a setting is wrong and an exception occurs the entire plugin may crash
+        settings = get_settings()
 
-    if( (not(settings[XMPP_USERNAME] and not settings[XMPP_USERNAME].isspace())) or
-       (not(settings[XMPP_PASSWORD] and not settings[XMPP_PASSWORD].isspace())) or
-       (not(settings[XMPP_SERVER] and not settings[XMPP_SERVER].isspace()))
-       ):
-       print("XMPP_USERNAME:'{}', or XMPP_PASSWORD:'{}', or XMPP_SERVER:'{}' are empty, cannot send xmpp message."
-             .format(settings[XMPP_USERNAME], settings[XMPP_PASSWORD], settings[XMPP_SERVER]))
-       return
+        if( (not(settings[XMPP_USERNAME] and not settings[XMPP_USERNAME].isspace())) or
+        (not(settings[XMPP_PASSWORD] and not settings[XMPP_PASSWORD].isspace())) or
+        (not(settings[XMPP_SERVER] and not settings[XMPP_SERVER].isspace()))
+        ):
+            print("XMPP_USERNAME:'{}', or XMPP_PASSWORD:'{}', or XMPP_SERVER:'{}' are empty, cannot send xmpp message."
+                    .format(settings[XMPP_USERNAME], settings[XMPP_PASSWORD], settings[XMPP_SERVER]))
+            return
 
-    jid = xmpp.protocol.JID( settings[XMPP_USERNAME] )
-    cl = xmpp.Client( settings[XMPP_SERVER], debug=[] )
-    con = cl.connect()
-    if not con:
-        print('could not connect!')
-        return False
-    # print('connected with {} to {} with user {}'.format(con, settings[XMPP_SERVER], settings[XMPP_USERNAME]))
-    auth = cl.auth( jid.getNode(), settings[XMPP_PASSWORD], resource = jid.getResource() )
-    if not auth:
-        print('could not authenticate!')
-        return False
-    # print('authenticated using {}'.format(auth) )
+        jid = xmpp.protocol.JID( settings[XMPP_USERNAME] )
+        cl = xmpp.Client( settings[XMPP_SERVER], debug=[] )
+        con = cl.connect()
+        if not con:
+            print('could not connect!')
+            return False
+        # print('connected with {} to {} with user {}'.format(con, settings[XMPP_SERVER], settings[XMPP_USERNAME]))
+        auth = cl.auth( jid.getNode(), settings[XMPP_PASSWORD], resource = jid.getResource() )
+        if not auth:
+            print('could not authenticate!')
+            return False
+        # print('authenticated using {}'.format(auth) )
 
-    #cl.SendInitPresence(requestRoster=0)   # you may need to uncomment this for old server
-    for r in get_xmpp_receipients():
-        id = cl.send(xmpp.protocol.Message( r, message ) )
-        # print('sent message with id {} to {}'.format(id, r) )
+        #cl.SendInitPresence(requestRoster=0)   # you may need to uncomment this for old server
+        for r in get_xmpp_receipients():
+            id = cl.send(xmpp.protocol.Message( r, message ) )
+            # print('sent message with id {} to {}'.format(id, r) )
+    except Exception as e:
+        print("Could not send xmpp message.", e)
+        traceback.print_exc()
 
 
 def send_unrecognised_msg(mqtt_topic, date, message):
-    settings = get_settings()
-    msg = settings[UNRECOGNISED_MSG].format(
-        mqtt_topic = mqtt_topic,
-        date = date,
-        message = message
-    )
-    if( settings[UNRECOGNISED_MSG_EMAIL] ):
-        email_send_msg( msg, "Unrecognised MQTT message!" )
-    if( settings[UNRECOGNISED_MSG_XMPP] ):
-        xmpp_send_msg( msg )
+    try:    #put the code inside a try except because if a setting is wrong and an exception occurs the entire plugin may crash
+        settings = get_settings()
+        msg = settings[UNRECOGNISED_MSG].format(
+            mqtt_topic = mqtt_topic,
+            date = date,
+            message = message
+        )
+        if( settings[UNRECOGNISED_MSG_EMAIL] ):
+            email_send_msg( msg, "Unrecognised MQTT message!" )
+        if( settings[UNRECOGNISED_MSG_XMPP] ):
+            xmpp_send_msg( msg )
+    except Exception as e:
+        print("Could not send xmpp unrecognised message.", e)
+        traceback.print_exc()
 
 
 def send_unassociated_sensor_msg(sensor_id, measurement, last_updated, mqtt_topic):
-    settings = get_settings()
-    msg = settings[XMPP_UNASSOCIATED_SENSOR_MSG].format(
-        sensor_id = sensor_id,
-        measurement = measurement,
-        last_updated = last_updated,
-        mqtt_topic = mqtt_topic
-    )
-    if( settings[UNASSOCIATED_SENSOR_XMPP] ):
-        xmpp_send_msg( msg )
-    if( settings[UNASSOCIATED_SENSOR_EMAIL] ):
-        email_send_msg( msg, "Unassociated sensor" )
+    try:    #put the code inside a try except because if a setting is wrong and an exception occurs the entire plugin may crash
+        settings = get_settings()
+        msg = settings[XMPP_UNASSOCIATED_SENSOR_MSG].format(
+            sensor_id = sensor_id,
+            measurement = measurement,
+            last_updated = last_updated,
+            mqtt_topic = mqtt_topic
+        )
+        if( settings[UNASSOCIATED_SENSOR_XMPP] ):
+            xmpp_send_msg( msg )
+        if( settings[UNASSOCIATED_SENSOR_EMAIL] ):
+            email_send_msg( msg, "Unassociated sensor" )
+    except Exception as e:
+        print("Could not send xmpp unassociated message.", e)
+        traceback.print_exc()
 
 
 def send_invalid_measurement_msg(water_tank, additional_info):
-    settings = get_settings()
-    msg = settings[XMPP_INVALID_SENSOR_MEASUREMENT_MSG].format(
-        water_tank_id = water_tank.id,
-        water_tank_label = water_tank.label,
-        sensor_id = water_tank.sensor_id,
-        percentage = water_tank.percentage,
-        measurement = water_tank.sensor_measurement,
-        last_updated = water_tank.last_updated,
-        mqtt_topic = water_tank.sensor_mqtt_topic,
-        additional_info = additional_info
-    )
-    print("Invalid measurement email:{}, xmpp:{}".format(water_tank.invalid_sensor_measurement_email, water_tank.invalid_sensor_measurement_xmpp))
-    if( water_tank.invalid_sensor_measurement_xmpp ):
-        xmpp_send_msg( msg )
-    if( water_tank.invalid_sensor_measurement_email ):
-        email_send_msg( msg, "Invalid measurement" )
+    try:    #put the code inside a try except because if a setting is wrong and an exception occurs the entire plugin may crash
+        settings = get_settings()
+        msg = settings[XMPP_INVALID_SENSOR_MEASUREMENT_MSG].format(
+            water_tank_id = water_tank.id,
+            water_tank_label = water_tank.label,
+            sensor_id = water_tank.sensor_id,
+            percentage = water_tank.percentage,
+            measurement = water_tank.sensor_measurement,
+            last_updated = water_tank.last_updated,
+            mqtt_topic = water_tank.sensor_mqtt_topic,
+            additional_info = additional_info
+        )
+        print("Invalid measurement email:{}, xmpp:{}".format(water_tank.invalid_sensor_measurement_email, water_tank.invalid_sensor_measurement_xmpp))
+        if( water_tank.invalid_sensor_measurement_xmpp ):
+            xmpp_send_msg( msg )
+        if( water_tank.invalid_sensor_measurement_email ):
+            email_send_msg( msg, "Invalid measurement" )
+    except Exception as e:
+        print("Could not send xmpp invalid measurement message.", e)
+        traceback.print_exc()
 
 
 def updateSensorMeasurementFromCmd(cmd, water_tanks, msg):
